@@ -10,18 +10,18 @@ class Peer:
         print(f"Successfully create peer {host} : {port}")
         #self.start()
         
-    def connect_with_peer(self, otherPeerHost, otherPeerPort):
+    def connect_with_peer(self, other_peer_host, other_peer_port):
         '''
         Connect this peer with another peer with given host and port
         '''
         try:
-            connectionEdge = self.socket.connect((otherPeerHost,otherPeerPort))
-            self.connections.append(connectionEdge)
-            print(f"Successfully connected with {otherPeerHost} : {otherPeerPort}")
-            print(f"Connection Edge = {connectionEdge}")
-        except socket.error as connectionError:
-            print(f"Error occur trying to connect with {otherPeerHost} : {otherPeerPort}")
-            print(f"Error code: {connectionError}")
+            connection_edge = self.socket.connect((other_peer_host,other_peer_port))
+            self.connections.append(connection_edge)
+            print(f"Successfully connected with {other_peer_host} : {other_peer_port}")
+            print(f"Connection Edge = {connection_edge}")
+        except socket.error as connection_error:
+            print(f"Error occur trying to connect with {other_peer_host} : {other_peer_port}")
+            print(f"Error code: {connection_error}")
     
     def listening_to_connect(self):
         '''
@@ -36,15 +36,13 @@ class Peer:
         
         print(f"Listening for new connection to {self.host} : {self.port}")
         while True:
-            connectionEdge, otherPeerAddress = self.socket.accept()
-            self.connections.append(connectionEdge)
-            (otherPeerHost, otherPeerPort) = socket.getnameinfo(otherPeerAddress, True)
-            otherPeerPort = int(otherPeerPort)
-            print(f"connection : {connectionEdge}")
-            print(f"Allow connection from {otherPeerAddress}")
+            connection_edge, other_peer_address = self.socket.accept()
+            self.connections.append(connection_edge)
+            (other_peer_host, other_peer_port) = socket.getnameinfo(other_peer_address, True)
+            other_peer_port = int(other_peer_port)
+            print(f"connection : {connection_edge}")
+            print(f"Allow connection from {other_peer_address}")
 
-            
-    
     def send_msg(self, data):
         '''
         Send data to all connections in connections list
@@ -52,24 +50,27 @@ class Peer:
         for connection in self.connections:
             try:
                 connection.sendall(data.encode())
-            except socket.error as communicateError:
-                print(f"False to communicate. Error: {communicateError}")
+            except socket.error as communicate_error:
+                print(f"False to communicate. Error: {communicate_error}")
+                
     def receive_msg(self):
         '''
         Receive msg from sender
         '''
-        (msg ,  otherPeerAddress) = self.socket.recvfrom(1024)
+        (msg ,  other_peer_address) = self.socket.recvfrom(1024)
         if msg == "stop":
             self.socket.close();
             return
-        # (otherPeerHost, otherPeerPort) = socket.getnameinfo(otherPeerAddress, True)
-        print(f"Receive message from {otherPeerAddress} : {msg}")
+        # (other_peer_host, other_peer_port) = socket.getnameinfo(other_peer_address, True)
+        print(f"Receive message from {other_peer_address} : {msg}")
+        
     def start(self):
         '''
         Create a new thread to start listening to others listen thread parallel with sending msg
         '''
-        self.listenThread = threading.Thread(target = self.listeningToConnect)
+        self.listenThread = threading.Thread(target = self.listening_to_connect)
         self.listenThread.start()
+        
     def stop_listening_for_connection(self):
         '''
         Stop listening for another connection, clear all connections
