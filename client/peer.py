@@ -79,5 +79,8 @@ class Peer:
         self._listen_thread.join()
         print("Clear all connection")
         self._connections.clear()
+        #* We should have some way to terminate _listen_thread before clearing the connection
+        #* nvhuy have yet to come up with a reasonable solution
+        #*IF you have something in mind, go for the implementation
         
     
