@@ -10,7 +10,10 @@ class Peer:
         print(f"Successfully create peer {host} : {port}")
         #self.start()
         
-    def ConnectWithPeer(self, otherPeerHost, otherPeerPort):
+    def connect_with_peer(self, otherPeerHost, otherPeerPort):
+        '''
+        Connect this peer with another peer with given host and port
+        '''
         try:
             connectionEdge = self.socket.connect((otherPeerHost,otherPeerPort))
             self.connections.append(connectionEdge)
@@ -20,7 +23,10 @@ class Peer:
             print(f"Error occur trying to connect with {otherPeerHost} : {otherPeerPort}")
             print(f"Error code: {connectionError}")
     
-    def listeningToConnect(self):
+    def listening_to_connect(self):
+        '''
+        Bind this peer socket to start listening to incoming connection continuously 
+        '''
         self.socket.bind((self.host, self.port))
         self.socket.listen(5)
         
@@ -36,22 +42,41 @@ class Peer:
             otherPeerPort = int(otherPeerPort)
             print(f"connection : {connectionEdge}")
             print(f"Allow connection from {otherPeerAddress}")
-            #
+
             
     
-    def sendMsg(self, data):
+    def send_msg(self, data):
+        '''
+        Send data to all connections in connections list
+        '''
         for connection in self.connections:
             try:
                 connection.sendall(data.encode())
             except socket.error as communicateError:
                 print(f"False to communicate. Error: {communicateError}")
-    def receiveMsg(self):
+    def receive_msg(self):
+        '''
+        Receive msg from sender
+        '''
         (msg ,  otherPeerAddress) = self.socket.recvfrom(1024)
+        if msg == "stop":
+            self.socket.close();
+            return
         # (otherPeerHost, otherPeerPort) = socket.getnameinfo(otherPeerAddress, True)
         print(f"Receive message from {otherPeerAddress} : {msg}")
     def start(self):
-        listenThread = threading.Thread(target = self.listeningToConnect)
-        listenThread.start()
-    
-    
+        '''
+        Create a new thread to start listening to others listen thread parallel with sending msg
+        '''
+        self.listenThread = threading.Thread(target = self.listeningToConnect)
+        self.listenThread.start()
+    def stop_listening_for_connection(self):
+        '''
+        Stop listening for another connection, clear all connections
+        '''
+        print(self.listenThread)
+        self.listenThread.join()
+        print("Clear all connection")
+        self.connections.clear()
+        
     
