@@ -1,8 +1,10 @@
-from client import peer_exp
+import sys
+sys.path.insert(0, '')
+from client import peer
 import os
 
 this_file_path = os.path.dirname(os.path.realpath(__file__))
-sender = peer_exp.SenderPeer('127.0.0.1', 1234, this_file_path + '/sender/')
+sender = peer.SenderPeer('127.0.0.1', 1234, this_file_path + '/sender/')
 
 sender.publish(fname='image.png')
 
