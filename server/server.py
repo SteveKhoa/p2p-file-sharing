@@ -1,9 +1,11 @@
 import socket
 import threading
+import time
 
 MAX_CONNECTIONS = 5
 SERVER_HOST = '127.0.0.1'
 SERVER_PORT = 12345  
+UPDATE_ACTIVE_CLIENT_TIME = 5  # seconds
 
 class Server:
     def __init__(self):
@@ -108,16 +110,48 @@ class Server:
             client_socket.send("No peers with the requested file.".encode("utf-8"))
 
 
-    def start(self):
-        print("listening...")
+    def _ping_client(client_socket):
+        try:
+            # Send a small data packet
+            client_socket.send(b'PING')
+            return True
+        except socket.error:
+            return False
+
+
+    def start_listen_to_new_client(self):
+        print("start listening...")
         while True:
             client_socket, client_address = self._server_socket.accept()
             client_handler = threading.Thread(target=self._handle_client, args=(client_socket,))
             client_handler.start()
 
+    def start_ping_active_clients(self):
+        # Remove dead peers from the self._peers dictionary
+        # A peer is considered dead if it does not respond to a ping
+        print("start pinging...")
+
+        while True:
+            time.sleep(UPDATE_ACTIVE_CLIENT_TIME)
+
+            print("Pinging...")
+
+            with self._lock:
+                for peer in self._peers:
+                    if not self.ping_client(peer):
+                        self._peers.pop(peer, None)
+
+
+
     def stop(self):
         self._server_socket.close()
 
+
+
 if __name__ == '__main__':
     server = Server()
-    server.start()
+    start_thread = threading.Thread(target=server.start_listen_to_new_client)
+    update_thread = threading.Thread(target=server.start_ping_active_clients)
+    start_thread.start()
+    update_thread.start()
+
