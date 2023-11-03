@@ -1,7 +1,7 @@
 import socket
 import threading
 
-import client.peer as client
+import client.peer_deprecated as client
 
 
 hostname = socket.gethostname()
@@ -17,4 +17,4 @@ while True:
     if msg == "stop":
         break
 
-newClient.socket.close()
+newClient._socket.close()
