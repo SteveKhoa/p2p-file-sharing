@@ -137,10 +137,9 @@ class Server:
             print("Pinging...")
 
             with self._lock:
-                for peer in self._peers:
-                    if not self.ping_client(peer):
+                for peer in list(self._peers.keys()):  # Create a copy of keys to iterate over
+                    if not self._ping_client(peer):
                         self._peers.pop(peer, None)
-
 
 
     def stop(self):
