@@ -14,6 +14,13 @@ MAX_NONACCEPTED_CONN = 5
 
 BUFF_SIZE = 1024
 
+"""
+Server Host address and Port 
+Any peer should have a connection to server
+To be able to request any action regarding it type (senderPeer or receiverPeer)
+"""
+SERVER_HOST = '127.0.0.1'
+SERVER_PORT = 12345  
 
 class Peer:
     def __init__(self, host, port, repo_dir):
@@ -22,7 +29,22 @@ class Peer:
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._repo_dir = repo_dir
         self._connections = []
-
+        self._connect_to_server()
+        
+    def _connect_to_server(self):
+        """
+        Connect to existing server
+        If we can not have a connection, This peer consider doing nothing
+        We should close the socket and terminate this peer object 
+        (Python have a garbage collector so i think manual termination is not necessary in this case)
+        """
+        try:
+            self._server_connection_edge = self._socket.connect((SERVER_HOST, SERVER_PORT))
+            print("Connected to server")
+        except socket.error as connection_error:
+            print(f"Error code: {connection_error}")
+            self.socket.close()
+            
 
 class SenderPeer(Peer):
     def _listening_to_connect(self):
