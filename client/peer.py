@@ -69,7 +69,21 @@ class SenderPeer(Peer):
         Request the server to add this peer to list of active peers who has 'fname'.
         """
         # This method does nothing for now since we dont have a server yet
-
+        
+        # Assuming every request is send like this:
+        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
+        # FILELIST is comma-seperated
+        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
+        _server_host_string = str(SERVER_HOST)
+        _server_port_string = str(SERVER_PORT)
+        _file_name_string = str(fname)
+        
+        #Handle post command data packet to send to server
+        _send_packet = "_port/" + str(SERVER_HOST) + ":" + str(SERVER_PORT) + ":" + str(fname)
+        try:
+            self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
+        except socket.error as error:
+            print(f"Error occur trying to post file on server. Error code: {error}") 
         # ? QUESTION: Nkhoa, I'm not sure why we need lname to be sent to server.
         # I think its not neccessary for the server to know that information.
         # Thats why I dont pass lname as param into this function
@@ -89,7 +103,13 @@ class SenderPeer(Peer):
         """
         # Post file information to the server
         self._post(fname)
-
+        #? QUESTION: nvhuy, Why did we want to recreate a new thread for every time we publish here?
+        
+        #? QUESTION: nvhuy, should we have a list of pair (lname, fname) store in sender peer so that
+        #? Went the receiver send a fetch request with lname, 
+        #? we can find the fname file directory and send this file to receiver
+        #* This would match well with nkhoa solution proposal in receiverPeer._connect_with_peer
+        
         # Create a separate thread for listening to other peers
         self._thread_listening = threading.Thread(
             target=self._listening_to_connect
@@ -139,6 +159,7 @@ class ReceiverPeer(Peer):
             # ! ISSUE: A Peer connection should also come with the FILENAME that connection
             # is requesting, since one sender could send different files to different receivers
             # at the same time.
+            
             # $ PROPOSAL: NKhoa: Perhaps right after connection, we should send some kind of 
             # meta information (such as REQUESTED_FILENAME) to the SenderPeer to make our request explicit
             # about what file this peer is requesting specifically
