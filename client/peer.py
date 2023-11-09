@@ -64,30 +64,34 @@ class SenderPeer(Peer):
             # print(f"connection : {connectionEdge}")
             # print(f"Allow connection from {otherPeerAddress}")
 
+    def _handle_send_request_to_server(self, request, file_list):
+        # Assuming every request is send like this:
+        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
+        # FILELIST is comma-seperated
+        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
+        
+        _server_host_string = str(SERVER_HOST)
+        _server_port_string = str(SERVER_PORT)
+        _file_name_string = str(file_list)
+        
+        #Handle post command data packet to send to server
+        _send_packet = request + str(SERVER_HOST) + ":" + str(SERVER_PORT) + ":" + _file_name_string
+        try:
+            self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
+        except socket.error as error:
+            print(f"Error occur trying to send request to server. Error code: {error}") 
+    
     def _post(self, fname):
         """
         Request the server to add this peer to list of active peers who has 'fname'.
         """
         # This method does nothing for now since we dont have a server yet
-        
-        # Assuming every request is send like this:
-        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
-        # FILELIST is comma-seperated
-        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
-        _server_host_string = str(SERVER_HOST)
-        _server_port_string = str(SERVER_PORT)
-        _file_name_string = str(fname)
-        
-        #Handle post command data packet to send to server
-        _send_packet = "_port/" + str(SERVER_HOST) + ":" + str(SERVER_PORT) + ":" + str(fname)
-        try:
-            self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
-        except socket.error as error:
-            print(f"Error occur trying to post file on server. Error code: {error}") 
+        _file_list = fname
+        _request = "_post"
+        self._handle_send_request_to_server(_request, _file_list)
         # ? QUESTION: Nkhoa, I'm not sure why we need lname to be sent to server.
-        # I think its not neccessary for the server to know that information.
+        # I think its not neccessary for the server to know that information.   
         # Thats why I dont pass lname as param into this function
-        pass
 
     def _request_end(self):
         """
