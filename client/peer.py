@@ -93,12 +93,20 @@ class SenderPeer(Peer):
         # I think its not neccessary for the server to know that information.   
         # Thats why I dont pass lname as param into this function
 
-    def _request_end(self):
+    def _request_end(self, fname):
         """
         Request the server to remove this peer from list of active peers who has 'fname'.
         """
         # This method does nothing for now since we dont have a server yet
-        pass
+        #* nvhuy: _request_end should only request server to remove 
+        #* this peer list of active peers of 1 specific 'fname, thus it should have fname as a argument.
+        #* This should be necessary when we want to only remove publishment of 1 file in our repo dir only
+        
+        #* For remove all files publishment, we should have another method
+        
+        _file_list = fname
+        _request = "_request_end"
+        self._handle_send_request_to_server(_request, _file_list)
 
     def publish(self, lname: str = "", fname: str = "text.txt"):
         """
