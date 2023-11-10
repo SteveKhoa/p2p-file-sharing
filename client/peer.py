@@ -70,12 +70,12 @@ class SenderPeer(Peer):
         # FILELIST is comma-seperated
         # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
         
-        _server_host_string = str(SERVER_HOST)
-        _server_port_string = str(SERVER_PORT)
+        _host_string = str(self._host)
+        _port_string = str(self._port)
         _file_name_string = str(file_list)
         
         #Handle post command data packet to send to server
-        _send_packet = request + str(SERVER_HOST) + ":" + str(SERVER_PORT) + ":" + _file_name_string
+        _send_packet = request + _host_string + ":" + _port_string + ":" + _file_name_string
         try:
             self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
         except socket.error as error:
