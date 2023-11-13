@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 
 """
 For socket.listen(MAX_NONACCEPTED_CONN).
@@ -22,6 +23,7 @@ To be able to request any action regarding it type (senderPeer or receiverPeer)
 SERVER_HOST = '127.0.0.1'
 SERVER_PORT = 12345  
 
+UPDATE_ACTIVE_CLIENT_TIME = 3 # seconds
 class Peer:
     def __init__(self, host, port, repo_dir):
         self._host = host
@@ -59,8 +61,17 @@ class SenderPeer(Peer):
         # print(f"Listening for new connection to {self._host} : {self._port}")
         while True:
             connectionEdge, otherPeerAddress = self._temp_socket.accept()
-            self._connections.append(connectionEdge)
-            
+            with connectionEdge:
+                print('Connected by', otherPeerAddress, connectionEdge)
+                self._connections.append(connectionEdge)
+                #*Assume package send from receiver:
+                #*FNAME
+                fname = connectionEdge.recv(BUFF_SIZE)
+                time.sleep(UPDATE_ACTIVE_CLIENT_TIME)
+                fname = fname.decode('utf-8')
+                self.share(fname)
+                self._connections.remove(connectionEdge)
+                #connectionEdge.close()
             # (otherPeerHost, otherPeerPort) = socket.getnameinfo(otherPeerAddress, True)
             # otherPeerPort = int(otherPeerPort)
             # print(f"connection : {connectionEdge}")
@@ -134,15 +145,15 @@ class SenderPeer(Peer):
         Request the server to remove this peer from list of active peers of a specific and close the temporary socket
         connection itself.
         """
-        pass
+        self._request_end(fname)
+        self._temp_socket.close()
+        
     def stop_publish(self):
         """
         Request the server to remove this peer from list of active peers and close the socket
         connection itself.
         """
-        self._request_end("test.txt")
-        self._temp_socket.close()
-        #*test.txt for testing 
+        
         self._socket.close()
 
     def share(self, fname: str):
@@ -154,20 +165,29 @@ class SenderPeer(Peer):
         # should be able to send multiple files to multiple peers differently.
         # $ PROPOSAL: NKhoa, see _connect_with_peer() for more details
         with open(self._repo_dir + fname, "rb") as infile:
-            while True:
-                data_chunk = infile.read(BUFF_SIZE)
-                if not data_chunk:
-                    break
-
-                if len(self._connections) > 0:
-                    
-                    for conn in self._connections:
+            
+            #*nvhuy: I found this easier way to send file
+            for conn in self._connections:
                         print(f"{conn}")
-                        conn.sendall(data_chunk)
-                else:
-                    print("No peer connection was established.")
-                    print("Waiting for more peers...")
-                    break
+                        conn.sendfile(infile)
+                        
+                        
+            #*nvhuy: Still want to keep the other way for reference later if needed
+            # while True:
+            #     data_chunk = infile.read(BUFF_SIZE)
+            #     if not data_chunk:
+            #         print(f"share {fname} completed")
+            #         break
+
+            #     if len(self._connections) > 0:
+                    
+            #         for conn in self._connections:
+            #             print(f"{conn}")
+            #             conn.sendall(data_chunk)
+            #     else:
+            #         print("No peer connection was established.")
+            #         print("Waiting for more peers...")
+            #         break
 
 
 class ReceiverPeer(Peer):
@@ -182,7 +202,7 @@ class ReceiverPeer(Peer):
             self._temp_socket.bind((self._host, self._port))
             connectionEdge = self._temp_socket.connect((other_peer_host, other_peer_port))
 
-
+            print(self._temp_socket.sendto(fname.encode('utf-8'),(other_peer_host, other_peer_port)))
             # ! ISSUE: A Peer connection should also come with the FILENAME that connection
             # is requesting, since one sender could send different files to different receivers
             # at the same time.
@@ -243,9 +263,13 @@ class ReceiverPeer(Peer):
         self._handle_send_request_to_server(_request,_file_list)
         
         _receive_string = self._socket.recv(2048)
+        
+        #! nvhuy: This only work when you run receiver for the first time, if you fetched 2 time in 1 run
+        #! It will throw [WinError 10053], not sure why tho??
+        #! It a connection aborted error, probably connection with server is aborted for whatever reason?
+        
         _peers = self._handle_receive_peers_string(_receive_string)
         return _peers
-
 
     def fetch(self, fname: str) -> bool:
         """
@@ -258,8 +282,9 @@ class ReceiverPeer(Peer):
         (sender_host, sender_port) = peers_arr[0]
 
         connect_status = self._connect_with_peer(sender_host, sender_port, fname)
-
+        
         if (connect_status):
+            
             with open(self._repo_dir + fname, "wb") as outfile:
                 while True:
                     print("receive: ")
@@ -273,5 +298,6 @@ class ReceiverPeer(Peer):
             return True
         else:
             return False
+    
     def stop_receive(self):
         self._socket.close()
