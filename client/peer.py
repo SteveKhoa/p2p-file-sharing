@@ -40,7 +40,7 @@ class Peer:
         """
         try:
             self._server_connection_edge = self._socket.connect((SERVER_HOST, SERVER_PORT))
-            print("Connected to server")
+            print(f"Connected to server with edge {self._server_connection_edge}")
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
             self.socket.close()
@@ -51,14 +51,16 @@ class SenderPeer(Peer):
         """
         Continuously looping to listen to any peer peer connection.
         """
-        self._socket.bind((self._host, self._port))
-        self._socket.listen(MAX_NONACCEPTED_CONN)
+        print(f"{self._host} and {self._port}")
+        self._temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._temp_socket.bind((self._host, self._port))
+        self._temp_socket.listen(MAX_NONACCEPTED_CONN)
 
         # print(f"Listening for new connection to {self._host} : {self._port}")
         while True:
-            connectionEdge, otherPeerAddress = self._socket.accept()
+            connectionEdge, otherPeerAddress = self._temp_socket.accept()
             self._connections.append(connectionEdge)
-
+            
             # (otherPeerHost, otherPeerPort) = socket.getnameinfo(otherPeerAddress, True)
             # otherPeerPort = int(otherPeerPort)
             # print(f"connection : {connectionEdge}")
@@ -74,8 +76,9 @@ class SenderPeer(Peer):
         _port_string = str(self._port)
         _file_name_string = str(file_list)
         
-        #Handle post command data packet to send to server
-        _send_packet = request + _host_string + ":" + _port_string + ":" + _file_name_string
+        #Handle command data packet to send to server
+        _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
+        _send_packet = _send_packet.encode("utf-8")
         try:
             self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
         except socket.error as error:
@@ -121,18 +124,25 @@ class SenderPeer(Peer):
         #? Went the receiver send a fetch request with lname, 
         #? we can find the fname file directory and send this file to receiver
         #* This would match well with nkhoa solution proposal in receiverPeer._connect_with_peer
-        
         # Create a separate thread for listening to other peers
         self._thread_listening = threading.Thread(
             target=self._listening_to_connect
         ).start()
 
+    def stop_publish_specific_file(self, fname):
+        """
+        Request the server to remove this peer from list of active peers of a specific and close the temporary socket
+        connection itself.
+        """
+        pass
     def stop_publish(self):
         """
         Request the server to remove this peer from list of active peers and close the socket
         connection itself.
         """
-        self._request_end()
+        self._request_end("test.txt")
+        self._temp_socket.close()
+        #*test.txt for testing 
         self._socket.close()
 
     def share(self, fname: str):
@@ -150,7 +160,9 @@ class SenderPeer(Peer):
                     break
 
                 if len(self._connections) > 0:
+                    
                     for conn in self._connections:
+                        print(f"{conn}")
                         conn.sendall(data_chunk)
                 else:
                     print("No peer connection was established.")
@@ -159,14 +171,17 @@ class SenderPeer(Peer):
 
 
 class ReceiverPeer(Peer):
-    def _connect_with_peer(self, other_peer_host, other_peer_port) -> bool:
+    def _connect_with_peer(self, other_peer_host, other_peer_port, fname) -> bool:
         """
         Get connected to other_peer.
 
         Returns True on successful connection, False on failed connection.
         """
         try:
-            connectionEdge = self._socket.connect((other_peer_host, other_peer_port))
+            self._temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._temp_socket.bind((self._host, self._port))
+            connectionEdge = self._temp_socket.connect((other_peer_host, other_peer_port))
+
 
             # ! ISSUE: A Peer connection should also come with the FILENAME that connection
             # is requesting, since one sender could send different files to different receivers
@@ -180,7 +195,40 @@ class ReceiverPeer(Peer):
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
             return False
-
+    def _handle_send_request_to_server(self, request, file_list):
+        # Assuming every request is send like this:
+        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
+        # FILELIST is comma-seperated
+        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
+        
+        _host_string = str(self._host)
+        _port_string = str(self._port)
+        _file_name_string = str(file_list)
+        
+        #Handle command data packet to send to server
+        _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
+        _send_packet = _send_packet.encode("utf-8")
+        try:
+            self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
+        except socket.error as error:
+            print(f"Error occur trying to send request to server. Error code: {error}") 
+    
+    def _handle_receive_peers_string(self, receiver_peers) -> [(str, int)]:
+        """
+        This function handle received data from server about peers who have fname
+        Return the list of peer (host, port) 
+        """
+        _peers = []
+        receiver_peers = receiver_peers.decode('utf-8')
+        _peers = receiver_peers.split(',')
+        _return_peers = []
+        for peer in _peers:
+            host, port = peer.split(':')
+            port = int(port)
+            peer = (host, port)
+            _return_peers.append(peer)
+        return _return_peers
+        
     def _get_peers(self, fname: str) -> [(str, int)]:
         """
         This function get the peer list who currently has file 'fname'
@@ -190,7 +238,14 @@ class ReceiverPeer(Peer):
         # This function needs server to operate.
         # For testing and simplicity, NKhoa put an example of
         # fetched array down here as a retval
-        return [("127.0.0.1", 1234)]
+        _file_list = fname
+        _request = "_get_peer"
+        self._handle_send_request_to_server(_request,_file_list)
+        
+        _receive_string = self._socket.recv(2048)
+        _peers = self._handle_receive_peers_string(_receive_string)
+        return _peers
+
 
     def fetch(self, fname: str) -> bool:
         """
@@ -202,12 +257,13 @@ class ReceiverPeer(Peer):
         peers_arr = self._get_peers(fname)  # Get the list of IP addresses from server
         (sender_host, sender_port) = peers_arr[0]
 
-        connect_status = self._connect_with_peer(sender_host, sender_port)
+        connect_status = self._connect_with_peer(sender_host, sender_port, fname)
 
         if (connect_status):
             with open(self._repo_dir + fname, "wb") as outfile:
                 while True:
-                    data_chunk = self._socket.recv(BUFF_SIZE)
+                    print("receive: ")
+                    data_chunk = self._temp_socket.recv(BUFF_SIZE)
                     if not data_chunk:
                         break
 
@@ -217,3 +273,5 @@ class ReceiverPeer(Peer):
             return True
         else:
             return False
+    def stop_receive(self):
+        self._socket.close()
