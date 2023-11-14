@@ -1,1 +1,0 @@
-_connected_client_ping_responses

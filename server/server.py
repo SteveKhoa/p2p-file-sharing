@@ -10,12 +10,12 @@ LISTEN_DURATION = 4 # seconds
 
 class Server:
     def __init__(self):
-        self._peers = {}  # A dictionary to store peer information [(address, port)] = list of available files
         self._lock = threading.Lock()
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind((SERVER_HOST, SERVER_PORT))
         self._server_socket.listen(MAX_CONNECTIONS)
 
+        self._peers = {}  # A dictionary to store peer information [(address, port)] = list of available files
         self._conntected_client_threads = {} # A dictionary to store connected client [(client socket)] = (client threads)
         self._connected_client_ping_responses = {} # A dictionary to store ping timer [(client socket)] = (boolean)
 
@@ -70,7 +70,7 @@ class Server:
 
                 elif request == "_pong":
                     self._connected_client_ping_responses[client_socket] = True
-                    print(f"Client {client_socket} is alive at {time.time()}")
+                    #print(f"Client {client_socket} is alive at {time.time()}")
 
                 else: 
                     print("Unknown request")
@@ -89,8 +89,35 @@ class Server:
 
         with self._lock:
             if (host, int(port)) in self._peers:
-                self._peers[(host, int(port))].extend(available_files)
+                # Only add files that are not already in the list
+                for file in available_files:
+                    if file not in self._peers[(host, int(port))]:
+                        self._peers[(host, int(port))].append(file)
             else:
+                self._peers[(host, int(port))] = available_files
+
+    def _update_peers(self, host, port, available_files):
+        with self._lock:
+            # If the peer already exists in the dictionary
+            if (host, int(port)) in self._peers:
+                current_files = set(self._peers[(host, int(port))])
+                new_files = set(available_files)
+
+                # Add files from available_files that are not in current_files
+                files_to_add = new_files - current_files
+                self._peers[(host, int(port))].extend(files_to_add)
+
+                # Remove files from current_files that are not in available_files
+                files_to_remove = current_files - new_files
+                updated_files = []
+                for file in self._peers[(host, int(port))]:
+                    if file not in files_to_remove:
+                        updated_files.append(file)
+
+                self._peers[(host, int(port))] = updated_files
+
+            else:
+                # If the peer does not exist in the dictionary, add it
                 self._peers[(host, int(port))] = available_files
 
     def _request_end(self, host, port, removed_file):
@@ -134,7 +161,7 @@ class Server:
 
             # Wait for a response
             self._connected_client_ping_responses[client_socket] = False
-            print(f"Pinging client {client_socket} at {time.time()}")
+            #print(f"Pinging client {client_socket} at {time.time()}")
 
             return True
 
@@ -148,8 +175,13 @@ class Server:
 
 
     def _discover_clients(self, client_socket):
-        client_socket.send(b'DISCOVER')
+        try:
+            client_socket.send(b'_discover')
+
+        except socket.error:
+            print(f"Client {client_socket} cannot be discovered")
     
+
 
     def start_listen_to_new_client(self):
         print("start listening...")
@@ -203,13 +235,17 @@ class Server:
 
                 connected_clients = list(self._conntected_client_threads.items()) # Create a copy of keys to iterate over
                 for client_socket, client_thread in connected_clients:
-                    # Create a copy of keys to iterate over
+                    # try to ping the client
                     if not self._ping_client(client_socket):
                         print(f"Client {client_socket} cannot be pinged")
 
                         client_socket.close()
                         client_thread.join()
                         self._conntected_client_threads.pop(client_socket)
+                        continue
+
+                    # try to discover the client files
+                    self._discover_clients(client_socket)
                         
                 for peer in list(self._peers.keys()):
                     #If any peer does not have publish file anymore, pop that peer from _peers dict 
@@ -241,5 +277,7 @@ if __name__ == '__main__':
         if input() == "end":
             server.stop()
             break
+
+
 
 
