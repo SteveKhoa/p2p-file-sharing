@@ -146,8 +146,12 @@ class Server:
                     # Create a copy of keys to iterate over
                     if not self._ping_client(client):
                         self._client_sockets.remove(client)
+                        
                 for peer in list(self._peers.keys()):
+                    #If any peer does not have publish file anymore, pop that peer from _peers dict 
                     print(f"client {peer} with fname {self._peers[peer]}")
+                    if not self._peers[peer]:
+                        self._peers.pop(peer)
 
 
     def stop(self):
