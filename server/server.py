@@ -6,7 +6,7 @@ MAX_CONNECTIONS = 5
 SERVER_HOST = '127.0.0.1'
 SERVER_PORT = 12345  
 PING_ACTIVE_CLIENT_CLOCK = 5  # seconds
-LISTEN_DURATION = 5 # seconds
+LISTEN_DURATION = 4 # seconds
 
 class Server:
     def __init__(self):
@@ -16,7 +16,8 @@ class Server:
         self._server_socket.bind((SERVER_HOST, SERVER_PORT))
         self._server_socket.listen(MAX_CONNECTIONS)
 
-        self._conntected_clients = {} # A dictionary to store connected client [(client socket)] = (client threads)
+        self._conntected_client_threads = {} # A dictionary to store connected client [(client socket)] = (client threads)
+        self._connected_client_ping_responses = {} # A dictionary to store ping timer [(client socket)] = (boolean)
 
         self._running = True
 
@@ -66,6 +67,10 @@ class Server:
                 # in the form of a string (comma seperated between each)
                     host, port, files = data.split(":")
                     self._get_peer(client_socket, files)
+
+                elif request == "_pong":
+                    self._connected_client_ping_responses[client_socket] = True
+                    print(f"Client {client_socket} is alive at {time.time()}")
 
                 else: 
                     print("Unknown request")
@@ -124,11 +129,27 @@ class Server:
 
     def _ping_client(self, client_socket):
         try:
-            # Send a small data packet
-            client_socket.send(b'PING')
+            # Send a 'PING' command
+            client_socket.send(b'_ping')
+
+            # Wait for a response
+            self._connected_client_ping_responses[client_socket] = False
+            print(f"Pinging client {client_socket} at {time.time()}")
+
             return True
+
         except socket.error:
             return False
+    
+    def _check_ping_alive(self, client_socket):
+        if client_socket in self._connected_client_ping_responses:
+            return self._connected_client_ping_responses[client_socket]
+        return False
+
+
+    def _discover_clients(self, client_socket):
+        client_socket.send(b'DISCOVER')
+    
 
     def start_listen_to_new_client(self):
         print("start listening...")
@@ -148,7 +169,7 @@ class Server:
             client_handler = threading.Thread(target=self._handle_client, args=(client_socket,))
             client_handler.start()
 
-            self._conntected_clients[client_socket] = client_handler
+            self._conntected_client_threads[client_socket] = client_handler
 
         self._server_socket.close()
 
@@ -164,16 +185,31 @@ class Server:
             time.sleep(PING_ACTIVE_CLIENT_CLOCK)
 
             print("Pinging...")
-
+            
+            
             with self._lock:
-                for client_socket, client_thread in self._conntected_clients.items():
-                    # Create a copy of keys to iterate over
-                    if not self._ping_client(client_socket):
-                        print(f"Client {client_socket} is dead")
+                
+                pinged_timer_clients = list(self._connected_client_ping_responses.keys()) # Create a copy of keys to iterate over
+                for client_socket in pinged_timer_clients:
+                    if not self._check_ping_alive(client_socket):
+                        print(f"Client {client_socket} is timeout at {time.time()}")
 
                         client_socket.close()
                         client_thread.join()
-                        self._conntected_clients.pop(client_socket)
+                        self._conntected_client_threads.pop(client_socket)
+                        self._connected_client_ping_responses.pop(client_socket)
+                        continue
+
+
+                connected_clients = list(self._conntected_client_threads.items()) # Create a copy of keys to iterate over
+                for client_socket, client_thread in connected_clients:
+                    # Create a copy of keys to iterate over
+                    if not self._ping_client(client_socket):
+                        print(f"Client {client_socket} cannot be pinged")
+
+                        client_socket.close()
+                        client_thread.join()
+                        self._conntected_client_threads.pop(client_socket)
                         
                 for peer in list(self._peers.keys()):
                     #If any peer does not have publish file anymore, pop that peer from _peers dict 
