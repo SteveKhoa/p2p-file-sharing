@@ -31,6 +31,7 @@ class Peer:
         self._socket_for_server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._repo_dir = repo_dir
         self._connections = []
+        self._published_file = []
         self._connect_to_server()
         
     def _connect_to_server(self):
@@ -128,6 +129,12 @@ class SenderPeer(Peer):
         Post file information to the server and start listening for any connection
         from other peers to start sharing.
         """
+        #Check for published file
+        if fname in self._published_file:
+            print(f"Already published {fname}")
+            return
+        #Add file to published list
+        self._published_file.append(fname)
         # Post file information to the server
         self._post(fname)
         #? QUESTION: nvhuy, Why did we want to recreate a new thread for every time we publish here?
@@ -137,6 +144,7 @@ class SenderPeer(Peer):
         #? we can find the fname file directory and send this file to receiver
         #* This would match well with nkhoa solution proposal in receiverPeer._connect_with_peer
         # Create a separate thread for listening to other peers
+        
         self._thread_listening = threading.Thread(
             target=self._listening_to_connect
         ).start()
@@ -146,14 +154,22 @@ class SenderPeer(Peer):
         Request the server to remove this peer from list of active peers of a specific and close the temporary socket
         connection itself.
         """
+        if fname not in self._published_file:
+            print(f"Can find published file name {fname}")
+            return
+        
         self._request_end(fname)
+        self._published_file.remove(fname)
         
     def stop_publish(self):
         """
         Request the server to remove this peer from list of active peers and close the socket
         connection itself.
         """
-        
+
+        for fname in self._published_file:
+            self.stop_publish_specific_file(fname=fname)
+            
         self._socket_for_server_connection.close()
 
     def share(self, fname: str):
