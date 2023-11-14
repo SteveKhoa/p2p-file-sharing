@@ -12,6 +12,14 @@ repo_dir = this_file_path + "/sender_repo_test/"
 sender = peer.SenderPeer(host, port, repo_dir)
 
 while True:
+    print("command pattern")
+    print("Command: publish lname fname  | Usage: Publish file fname to server")
+    print("Not use lname yet, so put what ever")
+    print("Example: publish Test test.txt")
+    print("Command: stop fname  | Usage: stop publish file fname")
+    print("Example: stop test.txt")
+    print("Command: end | Usage: shutdown this client" )
+    print("Example: end")
     prompt = input()
     print("Inputed prompt:|" + prompt + "|")
     print("Executing...")
