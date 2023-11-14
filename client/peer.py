@@ -45,7 +45,26 @@ class Peer:
             print(f"Connected to server with edge {self._server_connection_edge}")
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
-            self.socket.close()
+            self._socket_for_server_connection.close()
+            
+    def _handle_send_request_to_server(self, request, file_list):
+        # Assuming every request is send like this:
+        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
+        # FILELIST is comma-seperated
+        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
+        
+        _host_string = str(self._host)
+        _port_string = str(self._port)
+        _file_name_string = str(file_list)
+        
+        #Handle command data packet to send to server
+        _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
+        _send_packet = _send_packet.encode("utf-8")
+        print(_send_packet)
+        try:
+            print(self._socket_for_server_connection.sendto(_send_packet, (SERVER_HOST, SERVER_PORT)))
+        except socket.error as error:
+            print(f"Error occur trying to send request to server. Error code: {error}") 
             
 
 class SenderPeer(Peer):
@@ -76,24 +95,6 @@ class SenderPeer(Peer):
             # otherPeerPort = int(otherPeerPort)
             # print(f"connection : {connectionEdge}")
             # print(f"Allow connection from {otherPeerAddress}")
-
-    def _handle_send_request_to_server(self, request, file_list):
-        # Assuming every request is send like this:
-        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
-        # FILELIST is comma-seperated
-        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
-        
-        _host_string = str(self._host)
-        _port_string = str(self._port)
-        _file_name_string = str(file_list)
-        
-        #Handle command data packet to send to server
-        _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
-        _send_packet = _send_packet.encode("utf-8")
-        try:
-            self._socket_for_server_connection.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
-        except socket.error as error:
-            print(f"Error occur trying to send request to server. Error code: {error}") 
     
     def _post(self, fname):
         """
@@ -146,7 +147,6 @@ class SenderPeer(Peer):
         connection itself.
         """
         self._request_end(fname)
-        self._socket_for_peer_connection.close()
         
     def stop_publish(self):
         """
@@ -215,24 +215,6 @@ class ReceiverPeer(Peer):
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
             return False
-    
-    def _handle_send_request_to_server(self, request, file_list):
-        # Assuming every request is send like this:
-        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
-        # FILELIST is comma-seperated
-        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
-        
-        _host_string = str(self._host)
-        _port_string = str(self._port)
-        _file_name_string = str(file_list)
-        
-        #Handle command data packet to send to server
-        _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
-        _send_packet = _send_packet.encode("utf-8")
-        try:
-            self._socket_for_server_connection.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
-        except socket.error as error:
-            print(f"Error occur trying to send request to server. Error code: {error}") 
     
     def _handle_receive_peers_string(self, receiver_peers) -> [(str, int)]:
         """
