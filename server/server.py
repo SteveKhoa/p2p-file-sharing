@@ -68,7 +68,6 @@ class Server:
             # finally:
             #     client_socket.close()
 
-
     def _post(self, host, port, available_files):
         # Add the peer to the self._peers dictionary
         # with the list of available files
@@ -79,7 +78,6 @@ class Server:
                 self._peers[(host, int(port))].extend(available_files)
             else:
                 self._peers[(host, int(port))] = available_files
-
 
     def _request_end(self, host, port, removed_file):
         # Remove the specified file from the peer's list of available files
@@ -94,7 +92,6 @@ class Server:
                     if removed_file in self._peers[(host, int(port))]:
                         self._peers[(host, int(port))].remove(removed_file)
             
-
     def _get_peer(self, client_socket, filename):
         # Return a list of peers with the requested file
         # in the form of a string (comma seperated between each)
@@ -116,7 +113,6 @@ class Server:
             # No peer with the requested file
             client_socket.send("No peers with the requested file.".encode("utf-8"))
 
-
     def _ping_client(self, client_socket):
         try:
             # Send a small data packet
@@ -124,7 +120,6 @@ class Server:
             return True
         except socket.error:
             return False
-
 
     def start_listen_to_new_client(self):
         print("start listening...")
@@ -148,9 +143,11 @@ class Server:
 
             with self._lock:
                 for client in self._client_sockets:
-                    print(f"client_socket {client}")# Create a copy of keys to iterate over
+                    # Create a copy of keys to iterate over
                     if not self._ping_client(client):
                         self._client_sockets.remove(client)
+                for peer in list(self._peers.keys()):
+                    print(f"client {peer} with fname {self._peers[peer]}")
 
 
     def stop(self):

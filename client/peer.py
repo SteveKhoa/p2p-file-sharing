@@ -261,11 +261,12 @@ class ReceiverPeer(Peer):
         _request = "_get_peer"
         self._handle_send_request_to_server(_request,_file_list)
         
-        _receive_string = self._socket_for_server_connection.recv(2048)
-        
-        #! nvhuy: This only work when you run receiver for the first time, if you fetched 2 time in 1 run
-        #! It will throw [WinError 10053], not sure why tho??
-        #! It a connection aborted error, probably connection with server is aborted for whatever reason?
+        while True:
+            _receive_string = self._socket_for_server_connection.recv(2048)
+            if "PING" not in _receive_string.decode('utf-8') : break
+            
+        #* nvhuy: recv data can include "PING" sent by server, ping feature would send "PING" every 5 sec
+        #* This would ensure we get the package that have our ip address
         
         _peers = self._handle_receive_peers_string(_receive_string)
         return _peers
