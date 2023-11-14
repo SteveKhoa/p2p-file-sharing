@@ -23,7 +23,6 @@ To be able to request any action regarding it type (senderPeer or receiverPeer)
 SERVER_HOST = '127.0.0.1'
 SERVER_PORT = 12345  
 
-UPDATE_ACTIVE_CLIENT_TIME = 3 # seconds
 class Peer:
     def __init__(self, host, port, repo_dir):
         self._host = host
@@ -95,7 +94,6 @@ class SenderPeer(Peer):
                 #*Assume package send from receiver:
                 #*FNAME
                 fname = connectionEdge.recv(BUFF_SIZE)
-                time.sleep(UPDATE_ACTIVE_CLIENT_TIME)
                 fname = fname.decode('utf-8')
                 self.share(fname)
                 self._connections.remove(connectionEdge)
