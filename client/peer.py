@@ -69,6 +69,14 @@ class Peer:
             
 
 class SenderPeer(Peer):
+    def __init__(self, host, port, repo_dir):
+        super().__init__(host, port, repo_dir)
+        
+        # Create a separate thread for listening to other peers
+        #*nvhuy: should only create 1 thread for 1 peer lifetime, so i put itt at init
+        self._thread_listening = threading.Thread(
+            target=self._listening_to_connect
+        ).start()
     def _listening_to_connect(self):
         """
         Continuously looping to listen to any peer peer connection.
@@ -91,7 +99,7 @@ class SenderPeer(Peer):
                 fname = fname.decode('utf-8')
                 self.share(fname)
                 self._connections.remove(connectionEdge)
-                #connectionEdge.close()
+                connectionEdge.close()
             # (otherPeerHost, otherPeerPort) = socket.getnameinfo(otherPeerAddress, True)
             # otherPeerPort = int(otherPeerPort)
             # print(f"connection : {connectionEdge}")
@@ -143,12 +151,7 @@ class SenderPeer(Peer):
         #? Went the receiver send a fetch request with lname, 
         #? we can find the fname file directory and send this file to receiver
         #* This would match well with nkhoa solution proposal in receiverPeer._connect_with_peer
-        # Create a separate thread for listening to other peers
         
-        self._thread_listening = threading.Thread(
-            target=self._listening_to_connect
-        ).start()
-
     def stop_publish_specific_file(self, fname):
         """
         Request the server to remove this peer from list of active peers of a specific and close the temporary socket
@@ -167,8 +170,10 @@ class SenderPeer(Peer):
         connection itself.
         """
 
-        for fname in self._published_file:
+        while len(self._published_file) != 0:
+            fname = self._published_file[0]
             self.stop_publish_specific_file(fname=fname)
+            print(len(self._published_file))
             
         self._socket_for_server_connection.close()
 
