@@ -43,11 +43,12 @@ class Peer:
         try:
             self._server_connection_edge = self._socket_for_server_connection.connect((SERVER_HOST, SERVER_PORT))
             print(f"Connected to server with edge {self._server_connection_edge}")
+            threading.Thread(target=self._listen_to_server).start()
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
             self._socket_for_server_connection.close()
             
-    def _handle_send_request_to_server(self, request, file_list):
+    def _handle_send_request_to_server(self, request, file_list = ""):
         # Assuming every request is send like this:
         # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
         # FILELIST is comma-seperated
@@ -65,7 +66,32 @@ class Peer:
             print(self._socket_for_server_connection.sendto(_send_packet, (SERVER_HOST, SERVER_PORT)))
         except socket.error as error:
             print(f"Error occur trying to send request to server. Error code: {error}") 
-            
+
+    def _listen_to_server(self):
+        while True:
+            try:
+                message = self._socket_for_server_connection.recv(1024).decode('utf-8')
+                if message == '_ping':
+                    print("Received ping from server")
+                    self._handle_send_request_to_server("_pong")
+                elif message == '_discover':
+                    self._post_all_published_file()
+
+            except socket.error as e:
+                print(f"An error occurred: {e}")
+                break
+    
+    def _post_all_published_file(self):
+        all_published_file = ""        
+        
+        for fname in self._published_file:
+            all_published_file += fname + ","
+        
+        all_published_file = all_published_file.rstrip(',') # Remove the last comma
+
+        if all_published_file != "":
+            self._handle_send_request_to_server("_post", all_published_file)
+
 
 class SenderPeer(Peer):
     def __init__(self, host, port, repo_dir):
@@ -135,10 +161,12 @@ class SenderPeer(Peer):
         Post file information to the server and start listening for any connection
         from other peers to start sharing.
         """
-        #Check for published file
+        # Published file should only be check at server side
         if fname in self._published_file:
             print(f"Already published {fname}")
             return
+        
+
         #Add file to published list
         self._published_file.append(fname)
         # Post file information to the server
@@ -266,9 +294,9 @@ class ReceiverPeer(Peer):
         
         while True:
             _receive_string = self._socket_for_server_connection.recv(2048)
-            if "PING" not in _receive_string.decode('utf-8') : break
+            if "_ping" not in _receive_string.decode('utf-8') : break
             
-        #* nvhuy: recv data can include "PING" sent by server, ping feature would send "PING" every 5 sec
+        #* nvhuy: recv data can include "_ping" sent by server, ping feature would send "_ping" every 5 sec
         #* This would ensure we get the package that have our ip address
         
         _peers = self._handle_receive_peers_string(_receive_string)
