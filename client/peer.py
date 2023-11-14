@@ -28,7 +28,7 @@ class Peer:
     def __init__(self, host, port, repo_dir):
         self._host = host
         self._port = port
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket_for_server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._repo_dir = repo_dir
         self._connections = []
         self._connect_to_server()
@@ -41,7 +41,7 @@ class Peer:
         (Python have a garbage collector so i think manual termination is not necessary in this case)
         """
         try:
-            self._server_connection_edge = self._socket.connect((SERVER_HOST, SERVER_PORT))
+            self._server_connection_edge = self._socket_for_server_connection.connect((SERVER_HOST, SERVER_PORT))
             print(f"Connected to server with edge {self._server_connection_edge}")
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
@@ -54,13 +54,13 @@ class SenderPeer(Peer):
         Continuously looping to listen to any peer peer connection.
         """
         print(f"{self._host} and {self._port}")
-        self._temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._temp_socket.bind((self._host, self._port))
-        self._temp_socket.listen(MAX_NONACCEPTED_CONN)
+        self._socket_for_peer_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket_for_peer_connection.bind((self._host, self._port))
+        self._socket_for_peer_connection.listen(MAX_NONACCEPTED_CONN)
 
         # print(f"Listening for new connection to {self._host} : {self._port}")
         while True:
-            connectionEdge, otherPeerAddress = self._temp_socket.accept()
+            connectionEdge, otherPeerAddress = self._socket_for_peer_connection.accept()
             with connectionEdge:
                 print('Connected by', otherPeerAddress, connectionEdge)
                 self._connections.append(connectionEdge)
@@ -91,7 +91,7 @@ class SenderPeer(Peer):
         _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
         _send_packet = _send_packet.encode("utf-8")
         try:
-            self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
+            self._socket_for_server_connection.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
         except socket.error as error:
             print(f"Error occur trying to send request to server. Error code: {error}") 
     
@@ -146,7 +146,7 @@ class SenderPeer(Peer):
         connection itself.
         """
         self._request_end(fname)
-        self._temp_socket.close()
+        self._socket_for_peer_connection.close()
         
     def stop_publish(self):
         """
@@ -154,7 +154,7 @@ class SenderPeer(Peer):
         connection itself.
         """
         
-        self._socket.close()
+        self._socket_for_server_connection.close()
 
     def share(self, fname: str):
         """
@@ -198,11 +198,11 @@ class ReceiverPeer(Peer):
         Returns True on successful connection, False on failed connection.
         """
         try:
-            self._temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._temp_socket.bind((self._host, self._port))
-            connectionEdge = self._temp_socket.connect((other_peer_host, other_peer_port))
+            self._socket_for_peer_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._socket_for_peer_connection.bind((self._host, self._port))
+            connectionEdge = self._socket_for_peer_connection.connect((other_peer_host, other_peer_port))
 
-            print(self._temp_socket.sendto(fname.encode('utf-8'),(other_peer_host, other_peer_port)))
+            print(self._socket_for_peer_connection.sendto(fname.encode('utf-8'),(other_peer_host, other_peer_port)))
             # ! ISSUE: A Peer connection should also come with the FILENAME that connection
             # is requesting, since one sender could send different files to different receivers
             # at the same time.
@@ -215,6 +215,7 @@ class ReceiverPeer(Peer):
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
             return False
+    
     def _handle_send_request_to_server(self, request, file_list):
         # Assuming every request is send like this:
         # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
@@ -229,7 +230,7 @@ class ReceiverPeer(Peer):
         _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
         _send_packet = _send_packet.encode("utf-8")
         try:
-            self._socket.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
+            self._socket_for_server_connection.sendto(_send_packet, (SERVER_HOST, SERVER_PORT))
         except socket.error as error:
             print(f"Error occur trying to send request to server. Error code: {error}") 
     
@@ -262,7 +263,7 @@ class ReceiverPeer(Peer):
         _request = "_get_peer"
         self._handle_send_request_to_server(_request,_file_list)
         
-        _receive_string = self._socket.recv(2048)
+        _receive_string = self._socket_for_server_connection.recv(2048)
         
         #! nvhuy: This only work when you run receiver for the first time, if you fetched 2 time in 1 run
         #! It will throw [WinError 10053], not sure why tho??
@@ -288,7 +289,7 @@ class ReceiverPeer(Peer):
             with open(self._repo_dir + fname, "wb") as outfile:
                 while True:
                     print("receive: ")
-                    data_chunk = self._temp_socket.recv(BUFF_SIZE)
+                    data_chunk = self._socket_for_peer_connection.recv(BUFF_SIZE)
                     if not data_chunk:
                         break
 
@@ -300,4 +301,7 @@ class ReceiverPeer(Peer):
             return False
     
     def stop_receive(self):
-        self._socket.close()
+        '''
+        Terminate socket connected with server 
+        '''
+        self._socket_for_server_connection.close()
