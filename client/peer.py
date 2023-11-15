@@ -161,10 +161,10 @@ class SenderPeer(Peer):
         Post file information to the server and start listening for any connection
         from other peers to start sharing.
         """
-        # Published file should only be check at server side
+        
         if fname in self._published_file:
             print(f"Already published {fname}")
-            return
+            #return # Published file should only be check at server side
         
 
         #Add file to published list
