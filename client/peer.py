@@ -108,18 +108,9 @@ class Peer:
             print(f"Error occur trying to send request to server. Error code: {error}") 
 
     def _listen_to_server(self):
-        while True:
-            try:
-                message = self._socket_for_server_connection.recv(1024).decode('utf-8')
-                if message == '_ping':
-                    print("Received ping from server")
-                    self._handle_send_request_to_server("_pong")
-                elif message == '_discover':
-                    self._post_all_published_file()
-
-            except socket.error as e:
-                print(f"An error occurred: {e}")
-                break
+        raise NotImplementedError("Subclass must implement this method")
+    
+    
     
     def _post_all_published_file(self):
         all_published_file = ""        
@@ -142,6 +133,23 @@ class SenderPeer(Peer):
         self._thread_listening = threading.Thread(
             target=self._listening_to_connect
         ).start()
+
+    def _listen_to_server(self):
+        while True:
+            message = self._socket_for_server_connection.recv(1024).decode('utf-8')
+            request, data = message.split('/')
+            if request == '_ping':
+                print("Received ping from server")
+                self._handle_send_request_to_server("_pong")
+            elif request == '_discover':
+                self._post_all_published_file()
+            elif request == '_peer':
+                _peers = self._handle_receive_peers_string(data)
+                if len(_peers) > 0:
+                    self._post_all_published_file(_peers)
+                else:
+                    print("No peer has this file")
+
     def _listening_to_connect(self):
         """
         Continuously looping to listen to any peer peer connection.
@@ -278,6 +286,11 @@ class SenderPeer(Peer):
 
 
 class ReceiverPeer(Peer):
+    def __init__(self, host, port, repo_dir):
+        super().__init__(host, port, repo_dir)
+        self._getting_file = None
+        
+
     def _connect_with_peer(self, other_peer_host, other_peer_port, fname) -> bool:
         """
         Get connected to other_peer.
@@ -303,13 +316,37 @@ class ReceiverPeer(Peer):
             print(f"Error code: {connection_error}")
             return False
     
+
+    def _listen_to_server(self):
+        while True:
+            try:
+
+                message = self._socket_for_server_connection.recv(1024).decode('utf-8')
+                request, data = message.split('/')
+                if request == '_ping':
+                    print("Received ping from server")
+                    self._handle_send_request_to_server("_pong")
+                elif request == '_discover':
+                    self._post_all_published_file()
+                elif request == '_peer':
+                    _peers = self._handle_receive_peers_string(data)
+                    if len(_peers) > 0:
+                        self._contact_peer_and_fetch(_peers)
+                    else:
+                        print("No peer has this file")
+
+            except socket.error as e:
+                print(f"An error occurred: {e}")
+                break    
+    
+
     def _handle_receive_peers_string(self, receiver_peers) -> [(str, int)]:
         """
         This function handle received data from server about peers who have fname
         Return the list of peer (host, port) 
         """
         _peers = []
-        receiver_peers = receiver_peers.decode('utf-8')
+    
         _peers = receiver_peers.split(',')
         _return_peers = []
         for peer in _peers:
@@ -318,7 +355,7 @@ class ReceiverPeer(Peer):
             peer = (host, port)
             _return_peers.append(peer)
         return _return_peers
-        
+
     def _get_peers(self, fname: str) -> [(str, int)]:
         """
         This function get the peer list who currently has file 'fname'
@@ -332,15 +369,6 @@ class ReceiverPeer(Peer):
         _request = "_get_peer"
         self._handle_send_request_to_server(_request,_file_list)
         
-        while True:
-            _receive_string = self._socket_for_server_connection.recv(2048)
-            if "_ping" not in _receive_string.decode('utf-8') : break
-            
-        #* nvhuy: recv data can include "_ping" sent by server, ping feature would send "_ping" every 5 sec
-        #* This would ensure we get the package that have our ip address
-        
-        _peers = self._handle_receive_peers_string(_receive_string)
-        return _peers
 
     def fetch(self, fname: str) -> bool:
         """
@@ -349,8 +377,14 @@ class ReceiverPeer(Peer):
 
         Returns True on successful fetch, False otherwise.
         """
-        peers_arr = self._get_peers(fname)  # Get the list of IP addresses from server
+        self._getting_file = fname
+        self._get_peers(fname)  # Get the list of IP addresses from server
+        
+        
+    
+    def _contact_peer_and_fetch(self, peers_arr):
         (sender_host, sender_port) = peers_arr[0]
+        fname = self._getting_file
 
         connect_status = self._connect_with_peer(sender_host, sender_port, fname)
         
@@ -369,7 +403,7 @@ class ReceiverPeer(Peer):
             return True
         else:
             return False
-    
+
     def stop_receive(self):
         '''
         Terminate socket connected with server 

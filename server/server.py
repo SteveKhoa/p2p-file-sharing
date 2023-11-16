@@ -141,7 +141,17 @@ class Server:
                 if (host, int(port)) in self._peers:
                     if removed_file in self._peers[(host, int(port))]:
                         self._peers[(host, int(port))].remove(removed_file)
-            
+    
+    def _handle_send_request_to_client(self, client_socket : socket.socket, request, data):
+        # Send a 'GET_PEER' command
+        try:
+            client_socket.send(f"{request}/{data}".encode("utf-8"))
+        except:
+            print(f"Client {client_socket} cannot be reached")
+        # Return a list of peers with the requested file
+        # in the form of a string (comma seperated between each)
+        # Should looks like this:
+
     def _get_peer(self, client_socket, filename):
         # Return a list of peers with the requested file
         # in the form of a string (comma seperated between each)
@@ -158,16 +168,17 @@ class Server:
             # Send a list of peers with the requested file to the client
             # in the form of a string (comma seperated between each)
             # Should looks like this: 127.0.0.1:1234,222.222.3.4:3456
-            client_socket.send(",".join(matching_peers).encode("utf-8"))
+            
+            self._handle_send_request_to_client(client_socket, "_peer", "".join(matching_peers))
         else:
             # No peer with the requested file
-            client_socket.send("No peers with the requested file.".encode("utf-8"))
+            self._handle_send_request_to_client(client_socket, "_peer", "")
 
     def _ping_client(self, client_socket):
         try:
             # Send a 'PING' command
-            client_socket.send(b'_ping')
-
+            
+            self._handle_send_request_to_client(client_socket, "_ping", "")
             # Wait for a response
             self._connected_client_ping_responses[client_socket] = False
             #print(f"Pinging client {client_socket} at {time.time()}")
@@ -185,8 +196,7 @@ class Server:
 
     def _discover_clients(self, client_socket):
         try:
-            client_socket.send(b'_discover')
-
+            self._handle_send_request_to_client(client_socket, "_discover", "")
         except socket.error:
             print(f"Client {client_socket} cannot be discovered")
     
