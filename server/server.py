@@ -3,17 +3,25 @@ import threading
 import time
 
 MAX_CONNECTIONS = 5
-SERVER_HOST = '127.0.0.1'
+#SERVER_HOST = '127.0.0.1'
+SERVER_HOST = '0.0.0.0'
 SERVER_PORT = 12345  
+BROADCAST_START_PORT = 13000
+BROADCAST_END_PORT = 13010
+
 PING_ACTIVE_CLIENT_CLOCK = 5  # seconds
 LISTEN_DURATION = 4 # seconds
 
 class Server:
     def __init__(self):
         self._lock = threading.Lock()
+        
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind((SERVER_HOST, SERVER_PORT))
         self._server_socket.listen(MAX_CONNECTIONS)
+        
+        self._broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
         self._peers = {}  # A dictionary to store peer information [(address, port)] = list of available files
         self._conntected_client_threads = {} # A dictionary to store connected client [(client socket)] = (client threads)
@@ -21,16 +29,17 @@ class Server:
 
         self._running = True
 
-        self._listen_thread = threading.Thread(target=self.start_listen_to_new_client)
-        self._ping_thread = threading.Thread(target=self.start_ping_active_clients)
-        
+        self._listen_thread = threading.Thread(target=self._update_listen_to_new_client)
+        self._ping_thread = threading.Thread(target=self._update_ping_active_clients)
+        self._broadcast_thread = threading.Thread(target=self._update_broadcast_server_address)
+
         # Receive commands from clients (POST, REQUEST_END, GET_PEER) 
         # Update the self._peers dictionary as needed
         # Return a list of peer with requested file to the cilent
 
 
 
-    def _handle_client(self, client_socket):
+    def _handle_client(self, client_socket : socket.socket):
 
         # Assuming every request is send like this:
         # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
@@ -182,8 +191,7 @@ class Server:
             print(f"Client {client_socket} cannot be discovered")
     
 
-
-    def start_listen_to_new_client(self):
+    def _update_listen_to_new_client(self):
         print("start listening...")
         while self._running:
             try:
@@ -208,7 +216,7 @@ class Server:
         print("end listening")
 
 
-    def start_ping_active_clients(self):
+    def _update_ping_active_clients(self):
         # Remove dead peers from the self._peers dictionary
         # A peer is considered dead if it does not respond to a ping
         print("start pinging...")
@@ -255,15 +263,30 @@ class Server:
 
         print("end pinging")
 
+    def _update_broadcast_server_address(self):
+        while self._running:
+            try:
+
+                for port in range(BROADCAST_START_PORT, BROADCAST_END_PORT):
+                    message = f"SERVER_ADDRESS {socket.gethostbyname(socket.gethostname())}:{port}"
+                    self._broadcast_socket.sendto(message.encode(), ('<broadcast>', port))
+                
+                time.sleep(PING_ACTIVE_CLIENT_CLOCK)
+            except Exception as e:
+                print(f"Error broadcasting server address: {e}")
+
+
     def start(self):
         self._listen_thread.start()
         self._ping_thread.start()
+        self._broadcast_thread.start()
         print("Server started")
 
     def stop(self):
         self._running = False
         self._listen_thread.join()
         self._ping_thread.join()
+        self._broadcast_thread.join()
 
         print("Server stopped")
 

@@ -20,9 +20,13 @@ Server Host address and Port
 Any peer should have a connection to server
 To be able to request any action regarding it type (senderPeer or receiverPeer)
 """
-SERVER_HOST = '127.0.0.1'
+#SERVER_HOST = '127.0.0.1'
+
+BROADCAST_IP = '0.0.0.0'
 SERVER_PORT = 12345  
 
+BROADCAST_START_PORT = 13000
+BROADCAST_END_PORT = 13010
 class Peer:
     def __init__(self, host, port, repo_dir):
         self._host = host
@@ -31,8 +35,43 @@ class Peer:
         self._repo_dir = repo_dir
         self._connections = []
         self._published_file = []
-        self._connect_to_server()
-        
+        self._server_ip = None
+    
+        threading.Thread(target=self._handle_server_address_broadcast, args=()).start()
+    
+   
+    def _handle_server_address_broadcast(self):
+        while True:
+            try:
+                broadcast_socket = self._get_broadcast_socket()
+                
+                data, addr = broadcast_socket.recvfrom(1024)
+                message = data.decode()
+                if message.startswith("SERVER_ADDRESS"):
+                    _, server_address = message.split()
+                    server_ip, server_port = server_address.split(':')
+                    print(f"Received server IP: {server_ip}, server broadcast port: {server_port}")
+                    self._server_ip = server_ip
+
+                    self._connect_to_server()
+
+                    broadcast_socket.close()
+                    break
+            except Exception as e:
+                print(f"Error handling server address broadcast: {e}")
+
+    def _get_broadcast_socket(self):
+        broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        for port in range(BROADCAST_START_PORT, BROADCAST_END_PORT):
+            try:
+                broadcast_socket.bind((BROADCAST_IP, port))
+                broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                break
+            except Exception as e:
+                continue
+        return broadcast_socket
+
+
     def _connect_to_server(self):
         """
         Connect to existing server
@@ -41,13 +80,14 @@ class Peer:
         (Python have a garbage collector so i think manual termination is not necessary in this case)
         """
         try:
-            self._server_connection_edge = self._socket_for_server_connection.connect((SERVER_HOST, SERVER_PORT))
+            self._server_connection_edge = self._socket_for_server_connection.connect((self._server_ip, SERVER_PORT))
             print(f"Connected to server with edge {self._server_connection_edge}")
             threading.Thread(target=self._listen_to_server).start()
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
             self._socket_for_server_connection.close()
-            
+
+    
     def _handle_send_request_to_server(self, request, file_list = ""):
         # Assuming every request is send like this:
         # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
@@ -63,7 +103,7 @@ class Peer:
         _send_packet = _send_packet.encode("utf-8")
         print(_send_packet)
         try:
-            print(self._socket_for_server_connection.sendto(_send_packet, (SERVER_HOST, SERVER_PORT)))
+            print(self._socket_for_server_connection.sendto(_send_packet, (self._server_ip, SERVER_PORT)))
         except socket.error as error:
             print(f"Error occur trying to send request to server. Error code: {error}") 
 
