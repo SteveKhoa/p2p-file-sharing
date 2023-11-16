@@ -5,3 +5,4 @@ Write your name here to complete Task 1.1:
 - nkhoa
 - minhtriet
 - nvhuy
+- thuan
