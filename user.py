@@ -2,6 +2,7 @@ import random
 import socket
 import threading
 import os
+import shutil
 from client import peer
 
 def wlan_ip():
@@ -65,5 +66,8 @@ while True:
         sender.stop_publish()
         receiver.stop_receive()
         print("End.")
-        break
+        break 
 
+
+# Delete the directory after the program ends
+shutil.rmtree(repo_dir)
