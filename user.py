@@ -4,13 +4,23 @@ import threading
 import os
 from client import peer
 
+def wlan_ip():
+    import subprocess
+    result=subprocess.run('ipconfig',stdout=subprocess.PIPE,text=True).stdout.lower()
+    scan=0
+    for i in result.split('\n'):
+        if 'wireless' in i: scan=1
+        if scan:
+            if 'ipv4' in i: return i.split(':')[1].strip()
+
 # Get the host name of the machine
 host_name = socket.gethostname()
-
 random_port_number = random.randint(0, 1000)
 
-host_last_8bit_ip = socket.gethostbyname(host_name)
-print("Host name:", host_name, "IP address:", host_last_8bit_ip)
+#host_last_8bit_ip = socket.gethostbyname(host_name)
+host_ip = wlan_ip()
+
+print("Host name:", host_name, "IP address:", host_ip)
 
 sender_port = 1000 + random_port_number
 receiver_port = 2000 + random_port_number
@@ -21,8 +31,8 @@ repo_dir = this_file_path + "/user_repo_" + str(random_port_number) + "/"
 os.makedirs(repo_dir, exist_ok=True)
 
 
-receiver = peer.ReceiverPeer(host_last_8bit_ip, receiver_port, repo_dir)
-sender = peer.SenderPeer(host_last_8bit_ip, sender_port, repo_dir)
+receiver = peer.ReceiverPeer(host_ip, receiver_port, repo_dir)
+sender = peer.SenderPeer(host_ip, sender_port, repo_dir)
 
 
 while True:

@@ -300,7 +300,9 @@ class ReceiverPeer(Peer):
             self._socket_for_peer_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket_for_peer_connection.bind((self._host, self._port))
             connectionEdge = self._socket_for_peer_connection.connect((other_peer_host, other_peer_port))
-
+            
+            print(f"Connecting {self._host}:{self._port} peer to {other_peer_host}:{other_peer_port}")
+            
             self._socket_for_peer_connection.sendto(fname.encode('utf-8'),(other_peer_host, other_peer_port))
             # ! ISSUE: A Peer connection should also come with the FILENAME that connection
             # is requesting, since one sender could send different files to different receivers
