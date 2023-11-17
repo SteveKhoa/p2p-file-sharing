@@ -53,10 +53,11 @@ class Server:
         while self._running:
             # Seperate request and data from the package
             package = client_socket.recv(1024).decode("utf-8").strip()
-            request, data = package.split("/")
-            #print(pack)
 
             print(package)
+
+            request, data = package.split("/")
+            
             try:
                 if request == "_post":  
                 # Process a POST request from a peer to announce its available files

@@ -45,7 +45,7 @@ class Peer:
             try:
                 broadcast_socket = self._get_broadcast_socket()
                 
-                data, addr = broadcast_socket.recvfrom(1024)
+                data, addr = broadcast_socket.recvfrom(BUFF_SIZE)
                 message = data.decode()
                 if message.startswith("SERVER_ADDRESS"):
                     _, server_address = message.split()
@@ -136,7 +136,7 @@ class SenderPeer(Peer):
 
     def _listen_to_server(self):
         while True:
-            message = self._socket_for_server_connection.recv(1024).decode('utf-8')
+            message = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
             request, data = message.split('/')
             
             if request == '_ping':
@@ -322,7 +322,9 @@ class ReceiverPeer(Peer):
         while True:
             try:
 
-                message = self._socket_for_server_connection.recv(1024).decode('utf-8')
+                message = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
+                print(message)
+
                 request, data = message.split('/')
                 if request == '_ping':
                     print("RP Pinged from server ", data, " at ", time.time())
