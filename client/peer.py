@@ -103,7 +103,7 @@ class Peer:
         _send_packet = _send_packet.encode("utf-8")
         print(_send_packet)
         try:
-            print(self._socket_for_server_connection.sendto(_send_packet, (self._server_ip, SERVER_PORT)))
+            self._socket_for_server_connection.sendto(_send_packet, (self._server_ip, SERVER_PORT))
         except socket.error as error:
             print(f"Error occur trying to send request to server. Error code: {error}") 
 
@@ -138,17 +138,14 @@ class SenderPeer(Peer):
         while True:
             message = self._socket_for_server_connection.recv(1024).decode('utf-8')
             request, data = message.split('/')
+            
             if request == '_ping':
-                print("Received ping from server")
+                print("SP Pinged from server ", data, " at ", time.time())
                 self._handle_send_request_to_server("_pong")
             elif request == '_discover':
                 self._post_all_published_file()
-            elif request == '_peer':
-                _peers = self._handle_receive_peers_string(data)
-                if len(_peers) > 0:
-                    self._post_all_published_file(_peers)
-                else:
-                    print("No peer has this file")
+            else :
+                print("Unknown request from server")
 
     def _listening_to_connect(self):
         """
@@ -298,11 +295,13 @@ class ReceiverPeer(Peer):
         Returns True on successful connection, False on failed connection.
         """
         try:
+            print(f"Connecting {self._host}:{self._port} peer to {other_peer_host}:{other_peer_port}")
+            
             self._socket_for_peer_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket_for_peer_connection.bind((self._host, self._port))
             connectionEdge = self._socket_for_peer_connection.connect((other_peer_host, other_peer_port))
 
-            print(self._socket_for_peer_connection.sendto(fname.encode('utf-8'),(other_peer_host, other_peer_port)))
+            self._socket_for_peer_connection.sendto(fname.encode('utf-8'),(other_peer_host, other_peer_port))
             # ! ISSUE: A Peer connection should also come with the FILENAME that connection
             # is requesting, since one sender could send different files to different receivers
             # at the same time.
@@ -324,12 +323,13 @@ class ReceiverPeer(Peer):
                 message = self._socket_for_server_connection.recv(1024).decode('utf-8')
                 request, data = message.split('/')
                 if request == '_ping':
-                    print("Received ping from server")
+                    print("RP Pinged from server ", data, " at ", time.time())
                     self._handle_send_request_to_server("_pong")
                 elif request == '_discover':
                     self._post_all_published_file()
                 elif request == '_peer':
                     _peers = self._handle_receive_peers_string(data)
+                    print("RP Received peer list from server ", _peers)
                     if len(_peers) > 0:
                         self._contact_peer_and_fetch(_peers)
                     else:

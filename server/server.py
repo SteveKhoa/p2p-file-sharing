@@ -10,6 +10,8 @@ BROADCAST_START_PORT = 13000
 BROADCAST_END_PORT = 13010
 
 PING_ACTIVE_CLIENT_CLOCK = 5  # seconds
+BROADCAST_CYCLE_TIME = 2 # seconds
+
 LISTEN_DURATION = 4 # seconds
 
 class Server:
@@ -178,7 +180,7 @@ class Server:
         try:
             # Send a 'PING' command
             
-            self._handle_send_request_to_client(client_socket, "_ping", "")
+            self._handle_send_request_to_client(client_socket, "_ping", str( time.time() ))
             # Wait for a response
             self._connected_client_ping_responses[client_socket] = False
             #print(f"Pinging client {client_socket} at {time.time()}")
@@ -281,7 +283,7 @@ class Server:
                     message = f"SERVER_ADDRESS {socket.gethostbyname(socket.gethostname())}:{port}"
                     self._broadcast_socket.sendto(message.encode(), ('<broadcast>', port))
                 
-                time.sleep(PING_ACTIVE_CLIENT_CLOCK)
+                time.sleep(BROADCAST_CYCLE_TIME)
             except Exception as e:
                 print(f"Error broadcasting server address: {e}")
 
