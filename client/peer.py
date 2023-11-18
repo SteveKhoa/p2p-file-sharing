@@ -244,17 +244,7 @@ class SenderPeer(Peer):
         self._socket_for_peer_connection.close()
         print("Peer connection ended.")
     
-    def _post(self, fname):
-        """
-        Request the server to add this peer to list of active peers who has 'fname'.
-        """
-        
-        self._send_packet_to_server(RequestTypes.POST, fname)
-        # ? QUESTION: Nkhoa, I'm not sure why we need lname to be sent to server.
-        # I think its not neccessary for the server to know that information.   
-        # Thats why I dont pass lname as param into this function
-
-        
+   
 
     def publish(self, lname: str = "", fname: str = "text.txt"):
         """
@@ -270,7 +260,9 @@ class SenderPeer(Peer):
         #Add file to published list
         self._published_file.append(fname)
         # Post file information to the server
-        self._post(fname)
+        
+        self._send_packet_to_server(RequestTypes.POST, fname)
+        
         #? QUESTION: nvhuy, Why did we want to recreate a new thread for every time we publish here?
         
         #? QUESTION: nvhuy, should we have a list of pair (lname, fname) store in sender peer so that
@@ -409,17 +401,6 @@ class ReceiverPeer(Peer):
             _return_peers.append(peer)
         return _return_peers
 
-    def _get_peers(self, fname: str) -> [(str, int)]:
-        """
-        This function get the peer list who currently has file 'fname'
-        from the remote server.
-        """
-
-        # This function needs server to operate.
-        # For testing and simplicity, NKhoa put an example of
-        # fetched array down here as a retval
-        self._send_packet_to_server(RequestTypes.GET_PEER,fname)
-        
 
     def fetch(self, fname: str) -> bool:
         """
@@ -429,7 +410,8 @@ class ReceiverPeer(Peer):
         Returns True on successful fetch, False otherwise.
         """
         self._getting_file = fname
-        self._get_peers(fname)  # Get the list of IP addresses from server
+        
+        self._send_packet_to_server(RequestTypes.GET_PEER,fname)
         
         
     
