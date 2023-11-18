@@ -3,6 +3,7 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 from config.request import RequestTypes
+import sys
 
 MAX_CONNECTIONS = 5
 #SERVER_HOST = '127.0.0.1'
@@ -66,13 +67,17 @@ class Server:
         #*nvhuy: a while loop should ensure the server keep receive request from a client until the client is terminated
         while self._running:
             # Seperate request and data from the package
-            packet = client_socket.recv(1024).decode("utf-8").strip()
+            try :
+                packet = client_socket.recv(1024).decode("utf-8").strip()
+            except:
+                print(f"Client {client_socket} cannot be reached")
+                break
             
             if not packet:
                 continue
             
             packet_lines = self._parse_packet(packet)
-            print(packet, packet_lines)
+            #print(packet, packet_lines)
 
             for packet_line in packet_lines:
                 request = packet_line['request']
@@ -80,20 +85,20 @@ class Server:
                 port = packet_line['port']
                 data = packet_line['data']
                 
-                print(request, ip, port, data)
+                #print(request, ip, port, data)
 
                 try:
                     if request == RequestTypes.POST.value:  
                     # Process a POST request from a peer to announce its available files
                         
                         available_files = data.split(",")
-                        self._post(ip, port, available_files)
+                        self._publish_file(ip, port, available_files)
                         
-                    elif(request == RequestTypes.REQUEST_END.value):
+                    elif(request == RequestTypes.UNPUBLISH.value):
                     # Process a REQUEST_END request from a peer to remove a file from its list
                     # or remove itself from the server
                         removed_file = data
-                        self._request_end(ip, port, removed_file)
+                        self._unpublish_file(ip, port, removed_file)
 
 
                     elif request == RequestTypes.GET_PEER.value:
@@ -105,6 +110,15 @@ class Server:
                         self._connected_client_ping_responses[client_socket] = True
                         #print(f"Client {client_socket} is alive at {time.time()}")
 
+                    elif request == RequestTypes.REVEAL.value:
+                        available_files = data.split(",")
+                        self._update_peers(ip, port, available_files)
+                        #print(f"Client {client_socket} is alive at {time.time()}")
+
+                    elif request == RequestTypes.DISCONNECT.value:
+                        self._disconnect_client(client_socket)
+                        continue
+
                     else: 
                         print("Unknown request")
                 
@@ -115,7 +129,7 @@ class Server:
             # finally:
             #     client_socket.close()
 
-    def _post(self, host, port, available_files):
+    def _publish_file(self, host, port, available_files):
         # Add the peer to the self._peers dictionary
         # with the list of available files
         # or update the list of available files if the peer is already in the dictionary
@@ -153,7 +167,7 @@ class Server:
                 # If the peer does not exist in the dictionary, add it
                 self._peers[(host, int(port))] = available_files
 
-    def _request_end(self, host, port, removed_file):
+    def _unpublish_file(self, host, port, removed_file):
         # Remove the specified file from the peer's list of available files
         # or remove the peer from the self._peers dictionary if no file is specified
 
@@ -166,6 +180,21 @@ class Server:
                     if removed_file in self._peers[(host, int(port))]:
                         self._peers[(host, int(port))].remove(removed_file)
     
+    def _disconnect_client(self, client_socket : socket.socket):
+        with self._lock:
+            
+            self._conntected_client_threads.pop(client_socket)
+            self._connected_client_ping_responses.pop(client_socket)
+            
+
+            for peer, files in self._peers.items():
+                if peer[0] == client_socket.getpeername()[0] and peer[1] == client_socket.getpeername()[1]:
+                    self._peers.pop(peer)
+                    break
+            
+            client_socket.close()
+
+
     def _handle_send_request_to_client(self, client_socket : socket.socket, request : RequestTypes, data):
         # Send a 'GET_PEER' command
 
@@ -277,11 +306,7 @@ class Server:
                 for client_socket in pinged_timer_clients:
                     if not self._check_ping_alive(client_socket):
                         print(f"Client {client_socket} is timeout at {time.time()}")
-
-                        client_socket.close()
-                        client_thread.join()
-                        self._conntected_client_threads.pop(client_socket)
-                        self._connected_client_ping_responses.pop(client_socket)
+                        self._disconnect_client(client_socket)
                         continue
 
 
@@ -291,9 +316,7 @@ class Server:
                     if not self._ping_client(client_socket):
                         print(f"Client {client_socket} cannot be pinged")
 
-                        client_socket.close()
-                        client_thread.join()
-                        self._conntected_client_threads.pop(client_socket)
+                        self._disconnect_client(client_socket)
                         continue
 
                     # try to discover the client files
