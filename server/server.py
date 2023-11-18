@@ -1,6 +1,8 @@
 import socket
 import threading
 import time
+import xml.etree.ElementTree as ET
+from config.request import RequestTypes
 
 MAX_CONNECTIONS = 5
 #SERVER_HOST = '127.0.0.1'
@@ -38,57 +40,76 @@ class Server:
         # Receive commands from clients (POST, REQUEST_END, GET_PEER) 
         # Update the self._peers dictionary as needed
         # Return a list of peer with requested file to the cilent
+    
+    def _parse_packet(self, data):
+        if not data.strip().startswith('<root>'):
+            data = '<root>' + data + '</root>'  # Add a single root element
+        root = ET.fromstring(data)
+        packets = []
+        for child in root:
+            packet = {}
+            packet['request'] = child.tag
+            ip_port_data = child.text.split('|')
+            packet['ip'] = ip_port_data[0]
+            packet['port'] = ip_port_data[1]
+            packet['data'] = ip_port_data[2] if len(ip_port_data) > 2 else ''
+            packets.append(packet)
+        return packets
 
-
-
-    def _handle_client(self, client_socket : socket.socket):
-
+    def _handle_client_packet(self, client_socket : socket.socket):
         # Assuming every request is send like this:
-        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
-        # FILELIST is comma-seperated
-        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
+        # <REQUEST>HOST/PORT/DATA</REQUEST> 
+        # DATA can be comma-seperated
+        # example: <post>192.168.1.1/8000/text.txt,img.png</post>
 
         
         #*nvhuy: a while loop should ensure the server keep receive request from a client until the client is terminated
         while self._running:
             # Seperate request and data from the package
-            package = client_socket.recv(1024).decode("utf-8").strip()
-
-            print(package)
-
-            request, data = package.split("/")
+            packet = client_socket.recv(1024).decode("utf-8").strip()
             
-            try:
-                if request == "_post":  
-                # Process a POST request from a peer to announce its available files
-                    
-                    host, port, files = data.split(":")
-                    available_files = files.split(",")
-                    self._post(host, port, available_files)
-                    
-                elif(request == "_request_end"):
-                # Process a REQUEST_END request from a peer to remove a file from its list
-                # or remove itself from the server
-                    host, port, removed_file = data.split(":")
-                    self._request_end(host, port, removed_file)
-
-
-                elif request == "_get_peer":
-                # Process a GET_PEER request from a peer looking for a file
-                # Return a list of peers with the requested file
-                # in the form of a string (comma seperated between each)
-                    host, port, files = data.split(":")
-                    self._get_peer(client_socket, files)
-
-                elif request == "_pong":
-                    self._connected_client_ping_responses[client_socket] = True
-                    #print(f"Client {client_socket} is alive at {time.time()}")
-
-                else: 
-                    print("Unknown request")
+            if not packet:
+                continue
             
-            except Exception as e:
-                print("Error: {str(e)}")
+            packet_lines = self._parse_packet(packet)
+            print(packet, packet_lines)
+
+            for packet_line in packet_lines:
+                request = packet_line['request']
+                ip = packet_line['ip']
+                port = packet_line['port']
+                data = packet_line['data']
+                
+                print(request, ip, port, data)
+
+                try:
+                    if request == RequestTypes.POST.value:  
+                    # Process a POST request from a peer to announce its available files
+                        
+                        available_files = data.split(",")
+                        self._post(ip, port, available_files)
+                        
+                    elif(request == RequestTypes.REQUEST_END.value):
+                    # Process a REQUEST_END request from a peer to remove a file from its list
+                    # or remove itself from the server
+                        removed_file = data
+                        self._request_end(ip, port, removed_file)
+
+
+                    elif request == RequestTypes.GET_PEER.value:
+                    # Process a GET_PEER request from a peer looking for a file
+                    # Return a list of peers with the requested file
+                        self._get_peer(client_socket, data)
+
+                    elif request == RequestTypes.PONG.value:
+                        self._connected_client_ping_responses[client_socket] = True
+                        #print(f"Client {client_socket} is alive at {time.time()}")
+
+                    else: 
+                        print("Unknown request")
+                
+                except Exception as e:
+                    print("Error: {str(e)}")
 
             #*nvhuy: We do not want to close the socket here
             # finally:
@@ -145,10 +166,20 @@ class Server:
                     if removed_file in self._peers[(host, int(port))]:
                         self._peers[(host, int(port))].remove(removed_file)
     
-    def _handle_send_request_to_client(self, client_socket : socket.socket, request, data):
+    def _handle_send_request_to_client(self, client_socket : socket.socket, request : RequestTypes, data):
         # Send a 'GET_PEER' command
+
+        server_ip, server_port = client_socket.getpeername()
+
+        request_string = request.value
+        ip_string = str(server_ip)
+        port_string = str(server_port)
+        data_string = str(data)
+        #Handle command data packet to send to server
+        send_packet = "<"+request_string+">"+ip_string+"|"+ port_string +"|"+ data_string+"</"+request_string+">"
+        send_packet = send_packet.encode("utf-8")
         try:
-            client_socket.send(f"{request}/{data}".encode("utf-8"))
+            client_socket.send(send_packet)
         except:
             print(f"Client {client_socket} cannot be reached")
         # Return a list of peers with the requested file
@@ -172,16 +203,16 @@ class Server:
             # in the form of a string (comma seperated between each)
             # Should looks like this: 127.0.0.1:1234,222.222.3.4:3456
             
-            self._handle_send_request_to_client(client_socket, "_peer", "".join(matching_peers))
+            self._handle_send_request_to_client(client_socket, RequestTypes.RETURN_PEER, "".join(matching_peers))
         else:
             # No peer with the requested file
-            self._handle_send_request_to_client(client_socket, "_peer", "")
+            self._handle_send_request_to_client(client_socket, RequestTypes.RETURN_PEER, "")
 
     def _ping_client(self, client_socket):
         try:
             # Send a 'PING' command
             
-            self._handle_send_request_to_client(client_socket, "_ping", str( time.time() ))
+            self._handle_send_request_to_client(client_socket, RequestTypes.PING, str( time.time() ))
             # Wait for a response
             self._connected_client_ping_responses[client_socket] = False
             #print(f"Pinging client {client_socket} at {time.time()}")
@@ -199,7 +230,7 @@ class Server:
 
     def _discover_clients(self, client_socket):
         try:
-            self._handle_send_request_to_client(client_socket, "_discover", "")
+            self._handle_send_request_to_client(client_socket, RequestTypes.DISCOVER, "")
         except socket.error:
             print(f"Client {client_socket} cannot be discovered")
     
@@ -219,7 +250,7 @@ class Server:
 
             if client_address: 
                 print(f"Accepted socket with address {client_address}")
-            client_handler = threading.Thread(target=self._handle_client, args=(client_socket,))
+            client_handler = threading.Thread(target=self._handle_client_packet, args=(client_socket,))
             client_handler.start()
 
             self._conntected_client_threads[client_socket] = client_handler

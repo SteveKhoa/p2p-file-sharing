@@ -1,6 +1,9 @@
 import socket
 import threading
 import time
+import xml.etree.ElementTree as ET
+
+from config.request import RequestTypes
 
 """
 For socket.listen(MAX_NONACCEPTED_CONN).
@@ -29,7 +32,7 @@ BROADCAST_START_PORT = 13000
 BROADCAST_END_PORT = 13010
 class Peer:
     def __init__(self, host, port, repo_dir):
-        self._host = host
+        self._host_ip = host
         self._port = port
         self._socket_for_server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._repo_dir = repo_dir
@@ -87,23 +90,38 @@ class Peer:
             print(f"Error code: {connection_error}")
             self._socket_for_server_connection.close()
 
+    def _parse_packet(self, data):
+        if not data.strip().startswith('<root>'):
+            data = '<root>' + data + '</root>'  # Add a single root element
+        root = ET.fromstring(data)
+        packets = []
+        for child in root:
+            packet = {}
+            packet['request'] = child.tag
+            ip_port_data = child.text.split('|')
+            packet['ip'] = ip_port_data[0]
+            packet['port'] = ip_port_data[1]
+            packet['data'] = ip_port_data[2] if len(ip_port_data) > 2 else ''
+            packets.append(packet)
+        return packets
     
-    def _handle_send_request_to_server(self, request, file_list = ""):
+    def send_packet_to_server(self, request : RequestTypes , data = ""):
         # Assuming every request is send like this:
-        # REQUEST/HOST:PORT:FILELIST (except _get_peer which only send a filename)
-        # FILELIST is comma-seperated
-        # example: "_post/123.123.123.2:8888:text.txt"; "_get_peer/img.png"
+        # <REQUEST>HOST/PORT/DATA</REQUEST> 
+        # DATA can be comma-seperated
+        # example: <post>192.168.1.1|8000|text.txt,img.png</post>
         
-        _host_string = str(self._host)
-        _port_string = str(self._port)
-        _file_name_string = str(file_list)
+        request_string = request.value
+        ip_string = str(self._host_ip)
+        port_string = str(self._port)
+        data_string = str(data)
         
         #Handle command data packet to send to server
-        _send_packet = request + "/" + _host_string + ":" + _port_string + ":" + _file_name_string
-        _send_packet = _send_packet.encode("utf-8")
-        print(_send_packet)
+        send_packet = "<"+request_string+">"+ip_string+"|"+ port_string +"|"+ data_string+"</"+request_string+">"
+        send_packet = send_packet.encode("utf-8")
+        print(send_packet)
         try:
-            self._socket_for_server_connection.sendto(_send_packet, (self._server_ip, SERVER_PORT))
+            self._socket_for_server_connection.sendto(send_packet, (self._server_ip, SERVER_PORT))
         except socket.error as error:
             print(f"Error occur trying to send request to server. Error code: {error}") 
 
@@ -121,7 +139,7 @@ class Peer:
         all_published_file = all_published_file.rstrip(',') # Remove the last comma
 
         if all_published_file != "":
-            self._handle_send_request_to_server("_post", all_published_file)
+            self.send_packet_to_server( RequestTypes.POST , all_published_file)
 
 
 class SenderPeer(Peer):
@@ -136,24 +154,34 @@ class SenderPeer(Peer):
 
     def _listen_to_server(self):
         while True:
-            message = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
-            request, data = message.split('/')
+            packet = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
+        
+            if not packet:
+                continue
             
-            if request == '_ping':
-                print("SP Pinged from server ", data, " at ", time.time())
-                self._handle_send_request_to_server("_pong")
-            elif request == '_discover':
-                self._post_all_published_file()
-            else :
-                print("Unknown request from server")
+            packet_lines = self._parse_packet(packet)
+            
+            print(packet, packet_lines)
+            for packet_line in packet_lines:
+                request = packet_line['request']
+                data = packet_line['data']
+                print(request, data)
+                
+                if request == RequestTypes.PING.value:
+                    print("SP Pinged from server ", data, " at ", time.time())
+                    self.send_packet_to_server(RequestTypes.PONG)
+                elif request == RequestTypes.DISCOVER.value:
+                    self._post_all_published_file()
+                else :
+                    print("Unknown request from server")
 
     def _listening_to_connect(self):
         """
         Continuously looping to listen to any peer peer connection.
         """
-        print(f"{self._host} and {self._port}")
+        print(f"{self._host_ip} and {self._port}")
         self._socket_for_peer_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket_for_peer_connection.bind((self._host, self._port))
+        self._socket_for_peer_connection.bind((self._host_ip, self._port))
         self._socket_for_peer_connection.listen(MAX_NONACCEPTED_CONN)
 
         # print(f"Listening for new connection to {self._host} : {self._port}")
@@ -178,10 +206,8 @@ class SenderPeer(Peer):
         """
         Request the server to add this peer to list of active peers who has 'fname'.
         """
-        # This method does nothing for now since we dont have a server yet
-        _file_list = fname
-        _request = "_post"
-        self._handle_send_request_to_server(_request, _file_list)
+        
+        self.send_packet_to_server(RequestTypes.POST, fname)
         # ? QUESTION: Nkhoa, I'm not sure why we need lname to be sent to server.
         # I think its not neccessary for the server to know that information.   
         # Thats why I dont pass lname as param into this function
@@ -197,9 +223,7 @@ class SenderPeer(Peer):
         
         #* For remove all files publishment, we should have another method
         
-        _file_list = fname
-        _request = "_request_end"
-        self._handle_send_request_to_server(_request, _file_list)
+        self.send_packet_to_server(RequestTypes.REQUEST_END, fname)
 
     def publish(self, lname: str = "", fname: str = "text.txt"):
         """
@@ -295,13 +319,13 @@ class ReceiverPeer(Peer):
         Returns True on successful connection, False on failed connection.
         """
         try:
-            print(f"Connecting {self._host}:{self._port} peer to {other_peer_host}:{other_peer_port}")
+            print(f"Connecting {self._host_ip}:{self._port} peer to {other_peer_host}:{other_peer_port}")
             
             self._socket_for_peer_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._socket_for_peer_connection.bind((self._host, self._port))
+            self._socket_for_peer_connection.bind((self._host_ip, self._port))
             connectionEdge = self._socket_for_peer_connection.connect((other_peer_host, other_peer_port))
             
-            print(f"Connecting {self._host}:{self._port} peer to {other_peer_host}:{other_peer_port}")
+            print(f"Connecting {self._host_ip}:{self._port} peer to {other_peer_host}:{other_peer_port}")
             
             self._socket_for_peer_connection.sendto(fname.encode('utf-8'),(other_peer_host, other_peer_port))
             # ! ISSUE: A Peer connection should also come with the FILENAME that connection
@@ -321,23 +345,33 @@ class ReceiverPeer(Peer):
     def _listen_to_server(self):
         while True:
             try:
+                packet = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
+                packet_lines = self._parse_packet(packet)
 
-                message = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
-                print(message)
+                print(packet, packet_lines)
 
-                request, data = message.split('/')
-                if request == '_ping':
-                    print("RP Pinged from server ", data, " at ", time.time())
-                    self._handle_send_request_to_server("_pong")
-                elif request == '_discover':
-                    self._post_all_published_file()
-                elif request == '_peer':
-                    _peers = self._handle_receive_peers_string(data)
-                    print("RP Received peer list from server ", _peers)
-                    if len(_peers) > 0:
-                        self._contact_peer_and_fetch(_peers)
-                    else:
-                        print("No peer has this file")
+                for packet_line in packet_lines:
+                    request = packet_line['request']
+                    ip = packet_line['ip']
+                    port = packet_line['port']
+                    data = packet_line['data']
+                    
+                    print(request, ip, port, data)
+
+                    if request == RequestTypes.PING.value:
+                        print("RP Pinged from server ", data, " at ", time.time())
+                        self.send_packet_to_server(RequestTypes.PONG)
+
+                    elif request == RequestTypes.DISCOVER.value:
+                        self._post_all_published_file()
+
+                    elif request == RequestTypes.RETURN_PEER.value:
+                        peers = self._handle_receive_peers_string(data)
+                        print("RP Received peer list from server ", peers)
+                        if len(peers) > 0:
+                            self._contact_peer_and_fetch(peers)
+                        else:
+                            print("No peer has this file")
 
             except socket.error as e:
                 print(f"An error occurred: {e}")
@@ -369,9 +403,7 @@ class ReceiverPeer(Peer):
         # This function needs server to operate.
         # For testing and simplicity, NKhoa put an example of
         # fetched array down here as a retval
-        _file_list = fname
-        _request = "_get_peer"
-        self._handle_send_request_to_server(_request,_file_list)
+        self.send_packet_to_server(RequestTypes.GET_PEER,fname)
         
 
     def fetch(self, fname: str) -> bool:
