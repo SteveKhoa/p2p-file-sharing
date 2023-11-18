@@ -88,7 +88,7 @@ class Server:
                 #print(request, ip, port, data)
 
                 try:
-                    if request == RequestTypes.POST.value:  
+                    if request == RequestTypes.PUBLISH.value:  
                     # Process a POST request from a peer to announce its available files
                         
                         available_files = data.split(",")

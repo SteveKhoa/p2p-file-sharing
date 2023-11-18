@@ -261,7 +261,7 @@ class SenderPeer(Peer):
         self._published_file.append(fname)
         # Post file information to the server
         
-        self._send_packet_to_server(RequestTypes.POST, fname)
+        self._send_packet_to_server(RequestTypes.PUBLISH, fname)
         
         #? QUESTION: nvhuy, Why did we want to recreate a new thread for every time we publish here?
         
