@@ -5,9 +5,18 @@ import xml.etree.ElementTree as ET
 from config.request import RequestTypes
 import sys
 
+def wlan_ip():
+    import subprocess
+    result=subprocess.run('ipconfig',stdout=subprocess.PIPE,text=True).stdout.lower()
+    scan=0
+    for i in result.split('\n'):
+        if 'wireless' in i: scan=1
+        if scan:
+            if 'ipv4' in i: return i.split(':')[1].strip()
+
 MAX_CONNECTIONS = 5
 #SERVER_HOST = '127.0.0.1'
-SERVER_HOST = '0.0.0.0'
+SERVER_HOST = wlan_ip()
 SERVER_PORT = 12345  
 BROADCAST_START_PORT = 13000
 BROADCAST_END_PORT = 13010
