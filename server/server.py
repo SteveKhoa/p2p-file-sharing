@@ -1,6 +1,7 @@
 import socket
 import threading
 import time
+import os
 import xml.etree.ElementTree as ET
 from config.request import RequestTypes
 import sys
@@ -33,6 +34,7 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind((SERVER_HOST, SERVER_PORT))
         self._server_socket.listen(MAX_CONNECTIONS)
+        print(SERVER_HOST, SERVER_PORT)
         
         self._broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -344,7 +346,7 @@ class Server:
             try:
 
                 for port in range(BROADCAST_START_PORT, BROADCAST_END_PORT):
-                    message = f"SERVER_ADDRESS {socket.gethostbyname(socket.gethostname())}:{port}"
+                    message = f"SERVER_ADDRESS {SERVER_HOST}:{SERVER_PORT}"
                     self._broadcast_socket.sendto(message.encode(), ('<broadcast>', port))
                 
                 time.sleep(BROADCAST_CYCLE_TIME)
