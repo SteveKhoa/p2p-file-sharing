@@ -8,6 +8,9 @@ import tkinter
 
 END = "end"
 
+global gui_message 
+gui_message = "Welcome to our File Sharing App!!"
+
 def wlan_ip():
     import subprocess
     result=subprocess.run('ipconfig',stdout=subprocess.PIPE,text=True).stdout.lower()
@@ -18,23 +21,40 @@ def wlan_ip():
             if 'ipv4' in i: return i.split(':')[1].strip()
 
 def Publish_Command():
-    file_name = publish_input_entry.get()
-    publish_input_entry.delete(0, END)
-    sender.publish(file_name, file_name)
-    print("Published", file_name)
+    global gui_message
+    try:
+        file_name = publish_input_entry.get()
+        publish_input_entry.delete(0, END)
+        sender.publish(file_name, file_name)
+        gui_message = "Published " + file_name
+    except BaseException as e:
+        gui_message = "Published " + file_name + "failed!!, Error: " + e
+    finally:
+        message_label.config(text = gui_message)
 
-def Stop__Publish_Command():
-    sender.stop_publish()
-    receiver.stop_receive()
-    main_window.destroy()
-    pass
+def Stop_Publish_Command():
+    global gui_message
+    try: 
+        file_name = stop_publish_input_entry.get()
+        stop_publish_input_entry.delete(0, END)
+        sender.stop_publish_specific_file(file_name)
+        gui_message = "Stop Published " + file_name
+    except BaseException as e:
+        gui_message = "Stop Published " + file_name + "failed!!, Error: " + e
+    finally:
+        message_label.config(text = gui_message)
 
 def Fetch_Command():
-    file_name = fetch_input_entry.get()
-    fetch_input_entry.delete(0, END)
-    receiver.fetch(file_name)
-    print("Fetched", file_name)
-    pass
+    global gui_message
+    try:
+        file_name = fetch_input_entry.get()
+        fetch_input_entry.delete(0, END)
+        receiver.fetch(file_name)
+        gui_message = "Fetched " + file_name
+    except BaseException as e:
+        gui_message = "Fetched " + file_name + "failed!!, Error: " + e
+    finally:
+        message_label.config(text = gui_message)
 
 def Stop_Command():
     sender.stop_publish()
@@ -48,8 +68,6 @@ random_port_number = random.randint(0, 1000)
 
 #host_last_8bit_ip = socket.gethostbyname(host_name)
 host_ip = wlan_ip()
-
-print("Host name:", host_name, "IP address:", host_ip)
 
 sender_port = 1000 + random_port_number
 receiver_port = 2000 + random_port_number
@@ -79,30 +97,32 @@ publish_input_entry.grid(row=0, column=1)
 
 button = tkinter.Button(main_window, text='Publish', width=20, command=Publish_Command).grid(row=0, column=2)
 
-tkinter.Label(main_window, text='File to Fetch').grid(row=1, column=0)
-
 #*Stop Publish
-tkinter.Label(main_window, text='File to Publish').grid(row=1, column=0)
+tkinter.Label(main_window, text='File to stop Publish').grid(row=2, column=0)
 
 stop_publish_input_entry = tkinter.Entry(main_window)
-stop_publish_input_entry.grid(row=1, column=1)
+stop_publish_input_entry.grid(row=2, column=1)
 
-button = tkinter.Button(main_window, text='Publish', width=20, command=Publish_Command).grid(row=1, column=2)
+button = tkinter.Button(main_window, text='Stop publish', width=20, command=Stop_Publish_Command).grid(row=2, column=2)
 
 #*Fetch
-tkinter.Label(main_window, text='File to Fetch').grid(row=2, column=0)
+tkinter.Label(main_window, text='File to Fetch').grid(row=3, column=0)
 
 fetch_input_entry = tkinter.Entry(main_window)
-fetch_input_entry.grid(row=2, column=1)
+fetch_input_entry.grid(row=3, column=1)
 
-button = tkinter.Button(main_window, text='Fetch', width=20, command=Fetch_Command).grid(row=2, column=2)
+button = tkinter.Button(main_window, text='Fetch', width=20, command=Fetch_Command).grid(row=3, column=2)
 
 #*Stop
-button = tkinter.Button(main_window, text='Stop', width=20, command=Stop_Command).grid(row=3, column=0)
+button = tkinter.Button(main_window, text='Stop', width=20, command=Stop_Command).grid(row=4, column=0)
 
+#*GUI Message
+message_label = tkinter.Label(main_window, text=gui_message)
+message_label.grid(row=6, column=0, columnspan=2)
+    
 main_window.minsize(600, 300)
 
 main_window.mainloop()
-
+    
 # Delete the directory after the program ends
 shutil.rmtree(repo_dir)

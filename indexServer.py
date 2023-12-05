@@ -2,7 +2,6 @@ from server.server import Server
 
 
 
-
 if __name__ == '__main__':
     server = Server()
 
@@ -11,3 +10,4 @@ if __name__ == '__main__':
         if input() == "end":
             server.stop()
             break
+        
