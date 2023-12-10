@@ -394,6 +394,8 @@ class ReceiverPeer(Peer):
     
         _peers = receiver_peers.split(',')
         _return_peers = []
+        if (len(receiver_peers) < 2): return _return_peers
+        if (':' not in receiver_peers): return _return_peers
         for peer in _peers:
             host, port = peer.split(':')
             port = int(port)
@@ -412,7 +414,6 @@ class ReceiverPeer(Peer):
         self._getting_file = fname
         
         self._send_packet_to_server(RequestTypes.GET_PEER,fname)
-        
         
     
     def _contact_peer_and_fetch(self, peers_arr):
