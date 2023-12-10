@@ -99,6 +99,7 @@ class Peer:
         except socket.error as connection_error:
             print(f"Error code: {connection_error}")
             self._socket_for_server_connection.close()
+            
 
     def _parse_packet(self, data):
         if not data.strip().startswith('<root>'):
@@ -185,7 +186,6 @@ class SenderPeer(Peer):
             except socket.error as e:
                 print(f"End of connection with server: {e}")
                 break
-
             if not packet:
                 continue
             
@@ -225,7 +225,6 @@ class SenderPeer(Peer):
                 connectionEdge, otherPeerAddress = self._socket_for_peer_connection.accept()
             except socket.timeout:
                 continue
-
             with connectionEdge:
                 print('Connected by', otherPeerAddress, connectionEdge)
                 self._connections.append(connectionEdge)
@@ -352,7 +351,6 @@ class ReceiverPeer(Peer):
             except socket.error as e:
                 print(f"End of connection with server: {e}")
                 break
-
             if not packet:
                 continue
             
@@ -394,6 +392,8 @@ class ReceiverPeer(Peer):
     
         _peers = receiver_peers.split(',')
         _return_peers = []
+        if (len(receiver_peers) < 2): return _return_peers
+        if (':' not in receiver_peers): return _return_peers
         for peer in _peers:
             host, port = peer.split(':')
             port = int(port)
@@ -412,7 +412,6 @@ class ReceiverPeer(Peer):
         self._getting_file = fname
         
         self._send_packet_to_server(RequestTypes.GET_PEER,fname)
-        
         
     
     def _contact_peer_and_fetch(self, peers_arr):
