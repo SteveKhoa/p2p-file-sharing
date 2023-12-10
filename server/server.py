@@ -134,7 +134,7 @@ class Server:
                         print("Unknown request")
                 
                 except Exception as e:
-                    print("Error: {str(e)}")
+                    print("Error: {}", str(e))
 
             #*nvhuy: We do not want to close the socket here
             # finally:
