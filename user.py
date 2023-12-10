@@ -5,6 +5,7 @@ import os
 import shutil
 from client import peer
 import tkinter
+import sys
 
 END = "end"
 
@@ -27,8 +28,11 @@ def Publish_Command():
         publish_input_entry.delete(0, END)
         sender.publish(file_name, file_name)
         gui_message = "Published " + file_name
-    except BaseException as e:
-        gui_message = "Published " + file_name + "failed!!, Error: " + e
+    except socket.error:
+        gui_message = "Published " + file_name + " failed!!, Error: " + repr(socket.error)
+        print(socket.error)
+    except Exception as e:
+        gui_message = "Published " + file_name + " failed!!, Error: " + repr(e)
     finally:
         message_label.config(text = gui_message)
 
@@ -39,8 +43,11 @@ def Stop_Publish_Command():
         stop_publish_input_entry.delete(0, END)
         sender.stop_publish_specific_file(file_name)
         gui_message = "Stop Published " + file_name
-    except BaseException as e:
-        gui_message = "Stop Published " + file_name + "failed!!, Error: " + e
+    except socket.error:
+        gui_message = "Stop Published " + file_name + " failed!!, Error: " + str(socket.error)
+    except Exception as e:
+        gui_message = "Stop Published " + file_name + " failed!!, Error: " + str(e)
+        print(e)
     finally:
         message_label.config(text = gui_message)
 
@@ -51,16 +58,21 @@ def Fetch_Command():
         fetch_input_entry.delete(0, END)
         receiver.fetch(file_name)
         gui_message = "Fetched " + file_name
-    except BaseException as e:
-        gui_message = "Fetched " + file_name + "failed!!, Error: " + e
+    except socket.error:
+        gui_message = "Fetched " + file_name + " failed!!, Error: " + str(socket.error)
+    except Exception as e:
+        gui_message = "Fetched " + file_name + " failed!!, Error: " + str(e)
     finally:
         message_label.config(text = gui_message)
 
 def Stop_Command():
-    sender.stop_publish()
-    receiver.stop_receive()
-    main_window.destroy()
-    pass
+    try:
+        sender.stop_publish()
+        receiver.stop_receive()
+    finally:
+        main_window.destroy()
+        # Delete the directory after the program ends
+        shutil.rmtree(repo_dir)
 
 # Get the host name of the machine
 host_name = socket.gethostname()
@@ -88,6 +100,7 @@ main_window.title('User')
 
 tkinter.Label(main_window, text="Host name:"+ host_name).grid(row=5, column=0)
 tkinter.Label(main_window, text="IP address:"+ host_ip).grid(row=5, column=1)
+tkinter.Label(main_window, text="Repo directory:"+ "/user_repo_" + str(random_port_number)).grid(row=5, column=2, columnspan=2) 
 
 #* Publish 
 tkinter.Label(main_window, text='File to Publish').grid(row=0, column=0)
@@ -118,11 +131,16 @@ button = tkinter.Button(main_window, text='Stop', width=20, command=Stop_Command
 
 #*GUI Message
 message_label = tkinter.Label(main_window, text=gui_message)
-message_label.grid(row=6, column=0, columnspan=2)
-    
+message_label.grid(row=6, column=0, columnspan=3, rowspan=2)
+
 main_window.minsize(600, 300)
 
-main_window.mainloop()
-    
+try: 
+    main_window.mainloop()
+except Exception as e:
+    gui_message = "Error occur, Error: " + e
+    message_label.config(text = gui_message)
+
+
 # Delete the directory after the program ends
 shutil.rmtree(repo_dir)
