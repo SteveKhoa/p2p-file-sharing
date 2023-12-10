@@ -31,7 +31,7 @@ def Publish_Command():
     except socket.error:
         gui_message = "Published " + file_name + " failed!!, Error: " + repr(socket.error)
         print(socket.error)
-    except Exception as e:
+    except BaseException as e:
         gui_message = "Published " + file_name + " failed!!, Error: " + repr(e)
     finally:
         message_label.config(text = gui_message)
@@ -45,7 +45,7 @@ def Stop_Publish_Command():
         gui_message = "Stop Published " + file_name
     except socket.error:
         gui_message = "Stop Published " + file_name + " failed!!, Error: " + str(socket.error)
-    except Exception as e:
+    except BaseException as e:
         gui_message = "Stop Published " + file_name + " failed!!, Error: " + str(e)
         print(e)
     finally:
@@ -60,7 +60,7 @@ def Fetch_Command():
         gui_message = "Fetched " + file_name
     except socket.error:
         gui_message = "Fetched " + file_name + " failed!!, Error: " + str(socket.error)
-    except Exception as e:
+    except BaseException as e:
         gui_message = "Fetched " + file_name + " failed!!, Error: " + str(e)
     finally:
         message_label.config(text = gui_message)
@@ -137,7 +137,7 @@ main_window.minsize(600, 300)
 
 try: 
     main_window.mainloop()
-except Exception as e:
+except BaseException as e:
     gui_message = "Error occur, Error: " + e
     message_label.config(text = gui_message)
 
