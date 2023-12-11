@@ -34,7 +34,7 @@ def Publish_Command():
     except BaseException as e:
         gui_message = "Published " + file_name + " failed!!, Error: " + repr(e)
     finally:
-        message_label.config(text = gui_message)
+        message_label.insert(gui_message)
 
 def Stop_Publish_Command():
     global gui_message
@@ -49,7 +49,7 @@ def Stop_Publish_Command():
         gui_message = "Stop Published " + file_name + " failed!!, Error: " + str(e)
         print(e)
     finally:
-        message_label.config(text = gui_message)
+        message_label.insert(gui_message)
 
 def Fetch_Command():
     global gui_message
@@ -63,7 +63,7 @@ def Fetch_Command():
     except BaseException as e:
         gui_message = "Fetched " + file_name + " failed!!, Error: " + str(e)
     finally:
-        message_label.config(text = gui_message)
+        message_label.insert(gui_message)
 
 def Stop_Command():
     try:
@@ -130,17 +130,33 @@ button = tkinter.Button(main_window, text='Fetch', width=20, command=Fetch_Comma
 button = tkinter.Button(main_window, text='Stop', width=20, command=Stop_Command).grid(row=4, column=0)
 
 #*GUI Message
-message_label = tkinter.Label(main_window, text=gui_message)
+message_label = tkinter.Text(main_window, )
 message_label.grid(row=6, column=0, columnspan=3, rowspan=2)
 
 main_window.minsize(600, 300)
 
-try: 
-    main_window.mainloop()
-except BaseException as e:
-    gui_message = "Error occur, Error: " + e
-    message_label.config(text = gui_message)
+class PrintRedirector:
+    def __init__(self):
+        pass
 
+    def write(self, message):
+        global gui_message
+        if (message != '' and message != None):
+            gui_message = message
+            message_label.insert(tkinter.END, gui_message)
+        
+    def flush(self):
+        pass
+    
+sys.stdout = PrintRedirector()
+
+def clear_text():
+    message_label.delete('1.0', END)
+    main_window.after(10000, clear_text)
+
+
+main_window.after(10000, clear_text)
+main_window.mainloop()
 
 # Delete the directory after the program ends
 shutil.rmtree(repo_dir)
