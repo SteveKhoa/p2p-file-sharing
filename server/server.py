@@ -3,8 +3,14 @@ import threading
 import time
 import os
 import xml.etree.ElementTree as ET
-from config.request import RequestTypes
 import sys
+
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+
+sys.path.append(parent)
+from config.request import RequestTypes
+
 
 def wlan_ip():
     import subprocess
