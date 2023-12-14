@@ -6,6 +6,7 @@ import shutil
 from client import peer
 import tkinter
 import sys
+from tkinter import filedialog
 
 END = "end"
 
@@ -70,10 +71,13 @@ def Stop_Command():
         sys.stdout = old_std
         sender.stop_publish()
         receiver.stop_receive()
+    except BaseException:
+        pass
     finally:
         main_window.destroy()
         # Delete the directory after the program ends
         shutil.rmtree(repo_dir)
+        exit(1)
 
 # Get the host name of the machine
 host_name = socket.gethostname()
@@ -98,10 +102,11 @@ sender = peer.SenderPeer(host_ip, sender_port, repo_dir)
 main_window = tkinter.Tk()
 
 main_window.title('User')
+main_window.sourceFile = ''
 
-tkinter.Label(main_window, text="Host name:"+ host_name).grid(row=5, column=0)
-tkinter.Label(main_window, text="IP address:"+ host_ip).grid(row=5, column=1)
-tkinter.Label(main_window, text="Repo directory:"+ "/user_repo_" + str(random_port_number)).grid(row=5, column=2, columnspan=2) 
+tkinter.Label(main_window, text="Host name:"+ host_name).grid(row=6, column=0)
+tkinter.Label(main_window, text="IP address:"+ host_ip).grid(row=6, column=1)
+tkinter.Label(main_window, text="Repo directory:"+ "/user_repo_" + str(random_port_number)).grid(row=6, column=2, columnspan=2) 
 
 #* Publish 
 tkinter.Label(main_window, text='File to Publish').grid(row=0, column=0)
@@ -132,9 +137,23 @@ button = tkinter.Button(main_window, text='Stop', width=20, command=Stop_Command
 
 #*GUI Message
 message_label = tkinter.Text(main_window, )
-message_label.grid(row=6, column=0, columnspan=3, rowspan=2)
+message_label.grid(row=7, column=0, columnspan=3, rowspan=2)
 
 main_window.minsize(600, 300)
+
+def chooseFile():
+    main_window.sourceFile = filedialog.askopenfilename(parent=main_window,
+                                                        initialdir= "/", 
+                                                        title='Please select a directory')
+    sourceString.config(text=main_window.sourceFile)
+    file_name = os.path.basename(main_window.sourceFile)
+    print(file_name)
+    dst =  repo_dir + file_name
+    shutil.copyfile(main_window.sourceFile, dst)
+
+b_chooseFile = tkinter.Button(main_window, text = "Put file in repo", width = 20, command = chooseFile).grid(row=5, column=0)
+sourceString = tkinter.Label(main_window, text=main_window.sourceFile)
+sourceString.grid(row=5, column=2)
 
 class PrintRedirector:
     def __init__(self):
