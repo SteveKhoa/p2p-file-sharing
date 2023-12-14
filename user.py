@@ -67,6 +67,7 @@ def Fetch_Command():
 
 def Stop_Command():
     try:
+        sys.stdout = old_std
         sender.stop_publish()
         receiver.stop_receive()
     finally:
@@ -148,15 +149,16 @@ class PrintRedirector:
     def flush(self):
         pass
     
+old_std = sys.stdout
 sys.stdout = PrintRedirector()
 
 def clear_text():
     message_label.delete('1.0', END)
     main_window.after(10000, clear_text)
 
+main_window.protocol("WM_DELETE_WINDOW", Stop_Command)
 
 main_window.after(10000, clear_text)
 main_window.mainloop()
 
-# Delete the directory after the program ends
-shutil.rmtree(repo_dir)
+
