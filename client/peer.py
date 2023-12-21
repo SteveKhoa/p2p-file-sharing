@@ -1,6 +1,7 @@
 import socket
 import threading
 import time
+import datetime
 import xml.etree.ElementTree as ET
 
 from config.request import RequestTypes
@@ -92,12 +93,12 @@ class Peer:
         """
         try:
             self._server_connection_edge = self._socket_for_server_connection.connect((self._server_ip, SERVER_PORT))
-            print(f"Connected to server with edge {self._server_connection_edge}")
+            #print(f"Connected to server with edge {self._server_connection_edge}")
             self._server_listen_thread = threading.Thread(target=self._listen_to_server)
             self._server_listen_thread.start()
 
         except socket.error as connection_error:
-            print(f"Error code: {connection_error}")
+            #print(f"Error code: {connection_error}")
             self._socket_for_server_connection.close()
             
 
@@ -130,11 +131,12 @@ class Peer:
         #Handle command data packet to send to server
         send_packet = "<"+request_string+">"+ip_string+"|"+ port_string +"|"+ data_string+"</"+request_string+">"
         send_packet = send_packet.encode("utf-8")
-        print(send_packet)
+        #print(send_packet)
         try:
             self._socket_for_server_connection.sendto(send_packet, (self._server_ip, SERVER_PORT))
         except socket.error as error:
-            print(f"Error occur trying to send request to server. Error code: {error}") 
+            #print(f"Error occur trying to send request to server. Error code: {error}") 
+            pass
 
     def _listen_to_server(self):
         raise NotImplementedError("Subclass must implement this method")
@@ -162,8 +164,7 @@ class Peer:
         if self._socket_for_server_connection:
             self._socket_for_server_connection.close()
         
-
-        print("Peer connection ended.")
+        #print("Peer connection ended.")
 
 
 
@@ -184,7 +185,7 @@ class SenderPeer(Peer):
             try:
                 packet = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
             except socket.error as e:
-                print(f"End of connection with server: {e}")
+                #print(f"End of connection with server: {e}")
                 break
             if not packet:
                 continue
@@ -198,12 +199,13 @@ class SenderPeer(Peer):
                 print(request, data)
                 
                 if request == RequestTypes.PING.value:
-                    print("SP Pinged from server ", data, " at ", time.time())
+                    #print("SP Pinged from server ", data, " at ", time.time())
                     self._send_packet_to_server(RequestTypes.PONG)
                 elif request == RequestTypes.DISCOVER.value:
                     self._reveal_all_published_file()
                 else :
-                    print("Unknown request from server")
+                    #print("Unknown request from server")
+                    pass
 
             
                 
@@ -212,7 +214,7 @@ class SenderPeer(Peer):
         """
         Continuously looping to listen to any peer peer connection.
         """
-        print(f"{self._host_ip} and {self._port}")
+        #print(f"{self._host_ip} and {self._port}")
         self._socket_for_peer_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket_for_peer_connection.bind((self._host_ip, self._port))
         self._socket_for_peer_connection.listen(MAX_NONACCEPTED_CONN)
@@ -226,7 +228,7 @@ class SenderPeer(Peer):
             except socket.timeout:
                 continue
             with connectionEdge:
-                print('Connected by', otherPeerAddress, connectionEdge)
+                #print('Connected by', otherPeerAddress, connectionEdge)
                 self._connections.append(connectionEdge)
                 #*Assume package send from receiver:
                 #*FNAME
@@ -241,7 +243,7 @@ class SenderPeer(Peer):
             # print(f"Allow connection from {otherPeerAddress}")
 
         self._socket_for_peer_connection.close()
-        print("Peer connection ended.")
+        #print("Peer connection ended.")
     
    
 
@@ -252,8 +254,9 @@ class SenderPeer(Peer):
         """
         
         if fname in self._published_file:
-            print(f"Already published {fname}")
+            #print(f"Already published {fname}")
             #return # Published file should only be check at server side
+            pass
         
 
         #Add file to published list
@@ -275,7 +278,7 @@ class SenderPeer(Peer):
         connection itself.
         """
         if fname not in self._published_file:
-            print(f"Can find published file name {fname}")
+            #print(f"Can not find published file name {fname}")
             return
         
         self._published_file.remove(fname)
@@ -290,7 +293,7 @@ class SenderPeer(Peer):
         while len(self._published_file) != 0:
             fname = self._published_file[0]
             self.stop_publish_specific_file(fname=fname)
-            print(len(self._published_file))
+            #print(len(self._published_file))
 
         while len(self._connections) != 0: # Wait for all connection to be closed
             continue
@@ -310,12 +313,13 @@ class SenderPeer(Peer):
         # should be able to send multiple files to multiple peers differently.
         # $ PROPOSAL: NKhoa, see _connect_with_peer() for more details
         with open(self._repo_dir + fname, "rb") as infile:
-            
+            print("Start time: " + time.ctime(time.time()))
             #*nvhuy: I found this easier way to send file
             for conn in self._connections:
-                        print(f"{conn}")
+                        #print(f"{conn}")
                         conn.sendfile(infile)
-                        
+            
+            print("Ends time: " + time.ctime(time.time()))
                         
             #*nvhuy: Still want to keep the other way for reference later if needed
             # while True:
@@ -349,7 +353,7 @@ class ReceiverPeer(Peer):
             try:
                 packet = self._socket_for_server_connection.recv(BUFF_SIZE).decode('utf-8')
             except socket.error as e:
-                print(f"End of connection with server: {e}")
+                #print(f"End of connection with server: {e}")
                 break
             if not packet:
                 continue
@@ -364,10 +368,10 @@ class ReceiverPeer(Peer):
                 port = packet_line['port']
                 data = packet_line['data']
                 
-                print(request, ip, port, data)
+                #print(request, ip, port, data)
 
                 if request == RequestTypes.PING.value:
-                    print("RP Pinged from server ", data, " at ", time.time())
+                    #print("RP Pinged from server ", data, " at ", time.time())
                     self._send_packet_to_server(RequestTypes.PONG)
 
                 elif request == RequestTypes.DISCOVER.value:
@@ -375,7 +379,7 @@ class ReceiverPeer(Peer):
 
                 elif request == RequestTypes.RETURN_PEER.value:
                     peers = self._handle_receive_peers_string(data)
-                    print("RP Received peer list from server ", peers)
+                    #print("RP Received peer list from server ", peers)
                     if len(peers) > 0:
                         self._contact_peer_and_fetch(peers)
                     else:
@@ -428,14 +432,14 @@ class ReceiverPeer(Peer):
 
             with open(self._repo_dir + fname, "wb") as outfile:
                 while True:
-                    print("receive: ")
                     data_chunk = self._socket_for_peer_connection.recv(BUFF_SIZE)
+                    # print("receive: ")
                     if not data_chunk:
                         break
 
                     outfile.write(data_chunk)
 
-            print("Receiving file completed.")
+            #print("Receiving file completed.")
             return True
         else:
             return False
@@ -447,7 +451,7 @@ class ReceiverPeer(Peer):
         Returns True on successful connection, False on failed connection.
         """
         try:
-            print(f"Connecting {self._host_ip}:{self._port} peer to {other_peer_host}:{other_peer_port}")
+            #print(f"Connecting {self._host_ip}:{self._port} peer to {other_peer_host}:{other_peer_port}")
             
             
             self._socket_for_peer_connection.connect((other_peer_host, other_peer_port))
@@ -463,7 +467,7 @@ class ReceiverPeer(Peer):
 
             return True
         except socket.error as connection_error:
-            print(f"Error code: {connection_error}")
+            #print(f"Error code: {connection_error}")
             return False
     
 

@@ -173,7 +173,7 @@ sys.stdout = PrintRedirector()
 
 def clear_text():
     message_label.delete('1.0', END)
-    main_window.after(10000, clear_text)
+    main_window.after(100000, clear_text)
 
 main_window.protocol("WM_DELETE_WINDOW", Stop_Command)
 
